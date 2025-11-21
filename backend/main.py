@@ -9,6 +9,7 @@ from modules.advanced_ml import get_profitability_analysis, get_energy_forecast,
 from modules.optimization import get_energy_optimization, get_logistics_optimization, get_design_optimization
 from modules.enhanced_economics import get_enhanced_lcoh, get_monte_carlo_lcoh
 from modules.weather_api import get_real_time_energy_data
+from modules.ml_accuracy import get_model_accuracy_report, get_individual_model_accuracy
 import random
 import os
 
@@ -196,3 +197,13 @@ def certify_batch():
 def get_blockchain_certifications():
     """Get blockchain certification data"""
     return get_certifications()
+
+@app.get("/api/ml/accuracy")
+def get_ml_accuracy():
+    """Get comprehensive ML model accuracy report"""
+    return get_model_accuracy_report()
+
+@app.get("/api/ml/accuracy/{model_name}")
+def get_specific_model_accuracy(model_name: str):
+    """Get accuracy for a specific ML model (profitability, energy, degradation)"""
+    return get_individual_model_accuracy(model_name)
