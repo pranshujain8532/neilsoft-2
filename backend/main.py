@@ -207,3 +207,156 @@ def get_ml_accuracy():
 def get_specific_model_accuracy(model_name: str):
     """Get accuracy for a specific ML model (profitability, energy, degradation)"""
     return get_individual_model_accuracy(model_name)
+
+# ========================================
+# NEW ML MODEL ENDPOINTS
+# ========================================
+
+# Profit Predictor RL
+@app.post("/api/ml-rl/profit-predictor")
+def predict_profit_rl(plant_data: dict = None):
+    """Predict profitability using Reinforcement Learning (DQN)"""
+    from modules.profit_predictor_rl import predict_profitability_rl, get_profit_trends
+    
+    if plant_data is None:
+        plant_data = {
+            'weather_quality': random.uniform(0.6, 0.9),
+            'equipment_efficiency': random.uniform(0.65, 0.75),
+            'labor_productivity': random.uniform(0.75, 0.9),
+            'electricity_price_per_kwh': random.uniform(0.04, 0.08),
+            'inventory_days': random.randint(10, 20),
+            'h2_market_price': random.uniform(4.5, 5.5),
+            'equipment_health_score': random.uniform(75, 95),
+            'storage_health_score': random.uniform(80, 95)
+        }
+    
+    return predict_profitability_rl(plant_data)
+
+@app.get("/api/ml-rl/profit-trends/{plant_id}")
+def get_plant_profit_trends(plant_id: str, days: int = 30):
+    """Get historical profit trends for a plant"""
+    from modules.profit_predictor_rl import get_profit_trends
+    return get_profit_trends(plant_id, days)
+
+# Recommendation System
+@app.post("/api/ml-rl/recommend-plant")
+def recommend_plant_for_order(order: dict, plants: list = None):
+    """Recommend optimal plant for customer order"""
+    from modules.recommendation_system_rl import get_plant_recommendation_for_order
+    
+    # Sample plants if not provided
+    if plants is None:
+        plants = [
+            {'plant_id': 'H2P-001', 'name': 'Delhi Plant', 'current_capacity_available': 300, 
+             'distance_to_customer_km': 45, 'energy_score': 0.85, 'cost_efficiency_score': 0.75, 'price_per_kg': 5.20},
+            {'plant_id': 'H2P-002', 'name': 'Mumbai Plant', 'current_capacity_available': 400,
+             'distance_to_customer_km': 320, 'energy_score': 0.90, 'cost_efficiency_score': 0.82, 'price_per_kg': 4.95},
+            {'plant_id': 'H2P-003', 'name': 'Bangalore Plant', 'current_capacity_available': 250,
+             'distance_to_customer_km': 180, 'energy_score': 0.88, 'cost_efficiency_score': 0.70, 'price_per_kg': 5.40}
+        ]
+    
+    return get_plant_recommendation_for_order(order, plants)
+
+@app.post("/api/ml-rl/plant-improvements")
+def get_plant_improvement_recommendations(plant: dict):
+    """Get improvement recommendations for a plant"""
+    from modules.recommendation_system_rl import get_plant_improvements
+    return get_plant_improvements(plant)
+
+# Safety Monitor
+@app.post("/api/ml-rl/safety-analysis")
+def analyze_container_safety_ml(container: dict):
+    """Analyze storage container safety with ML"""
+    from modules.safety_monitor_ml import analyze_container_safety
+    return analyze_container_safety(container)
+
+@app.post("/api/ml-rl/plant-safety")
+def analyze_plant_safety_all(plant_id: str, containers: list):
+    """Analyze safety for entire plant"""
+    from modules.safety_monitor_ml import analyze_plant_safety
+    return analyze_plant_safety(plant_id, containers)
+
+# Chatbot
+@app.post("/api/chatbot/message")
+def chat_with_bot(message: dict):
+    """Chat with AI assistant"""
+    from modules.chatbot_gemini import chat_with_customer
+    
+    user_message = message.get('message', '')
+    session_id = message.get('session_id', 'default')
+    user_context = message.get('context', None)
+    
+    return chat_with_customer(user_message, session_id, user_context)
+
+# Logistics Optimizer
+@app.post("/api/logistics/optimize")
+def optimize_logistics_routes(deliveries: list):
+    """Optimize delivery routes and fleet requirements"""
+    from modules.logistics_optimizer_ml import optimize_delivery_logistics
+    return optimize_delivery_logistics(deliveries)
+
+@app.post("/api/logistics/fleet-tracking")
+def track_fleet_realtime(vehicles: list):
+    """Get real-time fleet tracking data"""
+    from modules.logistics_optimizer_ml import track_fleet_realtime
+    return track_fleet_realtime(vehicles)
+
+@app.get("/api/logistics/delay-stats")
+def get_delay_statistics():
+    """Get historical delay statistics"""
+    from modules.logistics_optimizer_ml import calculate_average_delays
+    return calculate_average_delays()
+
+# Demo endpoints with sample data
+@app.get("/api/demo/dashboard-rl")
+def get_demo_dashboard_with_rl():
+    """Get demo dashboard with all RL features"""
+    from modules.profit_predictor_rl import predict_profitability_rl
+    from modules.safety_monitor_ml import analyze_container_safety
+    
+    # Sample plant data
+    plant_data = {
+        'weather_quality': 0.82,
+        'equipment_efficiency': 0.68,
+        'labor_productivity': 0.85,
+        'electricity_price_per_kwh': 0.06,
+        'inventory_days': 15,
+        'h2_market_price': 5.10,
+        'equipment_health_score': 87,
+        'storage_health_score': 92
+    }
+    
+    # Sample container data
+    container_data = {
+        'container_id': 'TANK-001',
+        'pressure_bar': 25,
+        'temperature_c': 28,
+        'leak_ppm': 15,
+        'volume_m3': 150,
+        'fill_level_percent': 65,
+        'age_years': 2.5,
+        'pressure_cycles': 1200,
+        'vibration_level': 0.3,
+        'humidity_percent': 45,
+        'health_score': 87
+    }
+    
+    profit_prediction = predict_profitability_rl(plant_data)
+    safety_analysis = analyze_container_safety(container_data)
+    
+    return {
+        "dashboard_type": "RL-Enhanced Demo",
+        "profit_prediction": profit_prediction,
+        "safety_analysis": safety_analysis,
+        "timestamp": os.popen('echo %date% %time%').read().strip()
+    }
+
+if __name__ == "__main__":
+    import uvicorn
+    print("=" * 60)
+    print("H2-OptiPlant - Enhanced with 5 ML/RL Models")
+    print("=" * 60)
+    print("Starting server...")
+    print("API Docs: http://localhost:8000/docs")
+    print("=" * 60)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
