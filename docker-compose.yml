@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  # MongoDB
+  mongodb:
+    image: mongo:latest
+    container_name: gh2-mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: green-hydrogen
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - gh2-network
+
+  # Backend API
+  backend:
+    build:
+      context: ./server
+      dockerfile: ../Dockerfile.backend
+    container_name: gh2-backend
+    ports:
+      - "5000:5000"
+    environment:
+      - MONGODB_URI=mongodb://mongodb:27017/green-hydrogen
+      - JWT_SECRET=your_jwt_secret
+      - NODE_ENV=production
+    depends_on:
+      - mongodb
+    networks:
+      - gh2-network
+
+  # ML Services
+  ml-service:
+    build:
+      context: ./ml-services
+      dockerfile: ../Dockerfile.ml
+    container_name: gh2-ml-service
+    ports:
+      - "5001:5001"
+    environment:
+      - ML_PORT=5001
+    networks:
+      - gh2-network
+
+  # Frontend
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: gh2-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+      - ml-service
+    networks:
+      - gh2-network
+
+networks:
+  gh2-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:
