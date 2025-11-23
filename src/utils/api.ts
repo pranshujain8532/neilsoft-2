@@ -73,6 +73,7 @@ export const transportAPI = {
     getFleet: () => api.get('/transport/fleet'),
     getVehicle: (id: string) => api.get(`/transport/vehicle/${id}`),
     optimizeRoute: (data: any) => api.post('/transport/optimize', data),
+    assignVehicle: (data: { vehicleId: string, orderId: string }) => api.post('/transport/assign', data),
 };
 
 export const storageAPI = {

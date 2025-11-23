@@ -5,6 +5,9 @@ import { useTheme } from './hooks/useTheme';
 import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
+import OrderManagement from './pages/admin/OrderManagement';
+
+
 
 // Admin Pages
 import AdminDashboard from './pages/admin/Dashboard';
@@ -47,6 +50,7 @@ function App() {
                             <Routes>
                                 <Route path="dashboard" element={<AdminDashboard />} />
                                 <Route path="plants" element={<PlantMonitoring />} />
+                                <Route path="orders" element={<OrderManagement />} />
                                 <Route path="analytics" element={<Analytics />} />
                                 <Route path="labor" element={<LaborManagement />} />
                                 <Route path="energy-mix" element={<EnergyMix />} />

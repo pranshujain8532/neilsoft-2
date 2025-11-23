@@ -10,6 +10,41 @@ declare global {
     var inMemoryUsers: any[];
 }
 
+// Seed default users if empty
+if (!global.inMemoryUsers) {
+    global.inMemoryUsers = [];
+}
+
+const seedUsers = async () => {
+    if (global.inMemoryUsers.length === 0) {
+        const hashedPassword = await bcrypt.hash('admin123', 10);
+        const customerPassword = await bcrypt.hash('user123', 10);
+
+        global.inMemoryUsers.push({
+            _id: 'admin-1',
+            name: 'Admin User',
+            email: 'admin@h2.com',
+            password: hashedPassword,
+            role: 'admin',
+            companyName: 'H2 OptiPlant',
+            createdAt: new Date(),
+        });
+
+        global.inMemoryUsers.push({
+            _id: 'customer-1',
+            name: 'John Doe',
+            email: 'user@example.com',
+            password: customerPassword,
+            role: 'customer',
+            companyName: 'Green Energy Corp',
+            createdAt: new Date(),
+        });
+
+        console.log('✅ Default users seeded: admin@h2.com / admin123');
+    }
+};
+seedUsers();
+
 // Register
 router.post('/signup', async (req: any, res: any) => {
     try {

@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
-import { Menu, X, Home, LayoutDashboard, Factory, TruckIcon, Container, ShoppingCart, LogOut, Sun, Moon } from 'lucide-react';
+import { Menu, X, Home, LayoutDashboard, Factory, TruckIcon, Container, ShoppingCart, LogOut, Sun, Moon, Package } from 'lucide-react';
 import { useTheme } from '@/hooks/useTheme';
 
 const Navbar = () => {
@@ -52,6 +52,10 @@ const Navbar = () => {
                                     <Link to="/transport" className="navbar-link flex items-center space-x-1">
                                         <TruckIcon size={18} />
                                         <span>Transport</span>
+                                    </Link>
+                                    <Link to="/admin/orders" className="navbar-link flex items-center space-x-1">
+                                        <Package size={18} />
+                                        <span>Orders</span>
                                     </Link>
                                     <Link to="/storage" className="navbar-link flex items-center space-x-1">
                                         <Container size={18} />

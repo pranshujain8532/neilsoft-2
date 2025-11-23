@@ -1,12 +1,25 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Trash2, ShoppingBag, ArrowRight, CheckCircle } from 'lucide-react';
+import { Trash2, ShoppingBag, ArrowRight, CheckCircle, MapPin, ShieldAlert, Building } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { orderAPI } from '@/utils/api';
 
 const Cart = () => {
     const navigate = useNavigate();
     const [cart, setCart] = useState<any[]>([]);
     const [total, setTotal] = useState(0);
+    const [loading, setLoading] = useState(false);
+    const [step, setStep] = useState<'cart' | 'address'>('cart');
+
+    const [address, setAddress] = useState({
+        street: '',
+        city: '',
+        state: '',
+        zipCode: '',
+        country: 'India',
+        safetyContact: '',
+        siteAccessCode: '',
+    });
 
     useEffect(() => {
         const savedCart = localStorage.getItem('hydrogen_cart');
@@ -39,31 +52,54 @@ const Cart = () => {
         calculateTotal(newCart);
     };
 
-    const handleCheckout = () => {
+    const handleCheckout = async () => {
         if (cart.length === 0) return;
 
-        // Create new order
-        const newOrder = {
-            id: `ORD-${Date.now()}`,
-            date: new Date().toISOString(),
-            items: cart,
-            total: total,
-            status: 'Processing',
-            certificateId: `BLK-${Math.random().toString(36).substr(2, 9).toUpperCase()}`
-        };
+        const userStr = localStorage.getItem('user');
+        if (!userStr) {
+            alert('Please login to place an order');
+            navigate('/login');
+            return;
+        }
+        const user = JSON.parse(userStr);
 
-        // Save to order history
-        const existingOrders = JSON.parse(localStorage.getItem('hydrogen_orders') || '[]');
-        localStorage.setItem('hydrogen_orders', JSON.stringify([newOrder, ...existingOrders]));
+        setLoading(true);
 
-        // Clear cart
-        localStorage.removeItem('hydrogen_cart');
-        setCart([]);
-        setTotal(0);
+        try {
+            // Create order via API
+            const orderData = {
+                customer: user._id || user.id, // Handle both formats
+                product: {
+                    name: cart[0].name,
+                    purity: cart[0].purity,
+                    quantity: cart.reduce((acc, item) => acc + (item.quantity || 1), 0),
+                    pricePerKg: cart[0].price,
+                },
+                totalAmount: total * 1.05 + 50,
+                deliveryAddress: address,
+                status: 'pending',
+                certificate: {
+                    tokenId: `BLK-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
+                    carbonIntensity: 0.8,
+                    energyMix: { solar: 60, wind: 30, hydro: 10 }
+                }
+            };
 
-        // Navigate to orders
-        alert('Order placed successfully! Blockchain certificate generated.');
-        navigate('/orders');
+            await orderAPI.create(orderData);
+
+            // Clear cart
+            localStorage.removeItem('hydrogen_cart');
+            setCart([]);
+            setTotal(0);
+
+            alert('Order placed successfully! Admin will review shortly.');
+            navigate('/orders');
+        } catch (error: any) {
+            console.error('Checkout failed:', error);
+            alert(`Failed to place order: ${error.response?.data?.error || error.message}`);
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -72,7 +108,9 @@ const Cart = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
             >
-                <h1 className="text-4xl font-bold gradient-text mb-8">Shopping Cart</h1>
+                <h1 className="text-4xl font-bold gradient-text mb-8">
+                    {step === 'cart' ? 'Shopping Cart' : 'Delivery Details'}
+                </h1>
 
                 {cart.length === 0 ? (
                     <div className="card-glass p-12 text-center">
@@ -87,55 +125,146 @@ const Cart = () => {
                     </div>
                 ) : (
                     <div className="grid lg:grid-cols-3 gap-8">
-                        {/* Cart Items */}
-                        <div className="lg:col-span-2 space-y-4">
-                            {cart.map((item) => (
-                                <div key={item.id} className="card-glass p-6 flex items-center justify-between">
-                                    <div className="flex items-center space-x-4">
-                                        <div className="w-16 h-16 bg-gradient-to-br from-hydrogen-500 to-green-500 rounded-lg flex items-center justify-center text-white font-bold text-xl">
-                                            H₂
+                        {/* Left Column */}
+                        <div className="lg:col-span-2 space-y-6">
+                            {step === 'cart' ? (
+                                // Cart Items List
+                                <div className="space-y-4">
+                                    {cart.map((item) => (
+                                        <div key={item.id} className="card-glass p-6 flex items-center justify-between">
+                                            <div className="flex items-center space-x-4">
+                                                <div className="w-16 h-16 bg-gradient-to-br from-hydrogen-500 to-green-500 rounded-lg flex items-center justify-center text-white font-bold text-xl">
+                                                    H₂
+                                                </div>
+                                                <div>
+                                                    <h3 className="font-bold text-lg">{item.name}</h3>
+                                                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                                                        Purity: {item.purity}
+                                                    </p>
+                                                    <div className="text-green-500 font-bold mt-1">
+                                                        ${item.price.toFixed(2)} / kg
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center space-x-6">
+                                                <div className="flex items-center space-x-2">
+                                                    <button
+                                                        onClick={() => updateQuantity(item.id, (item.quantity || 1) - 1)}
+                                                        className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center"
+                                                    >
+                                                        -
+                                                    </button>
+                                                    <span className="font-bold w-8 text-center">{item.quantity || 1}</span>
+                                                    <button
+                                                        onClick={() => updateQuantity(item.id, (item.quantity || 1) + 1)}
+                                                        className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center"
+                                                    >
+                                                        +
+                                                    </button>
+                                                </div>
+                                                <div className="text-right min-w-[80px]">
+                                                    <div className="font-bold text-lg">
+                                                        ${(item.price * (item.quantity || 1)).toFixed(2)}
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={() => removeItem(item.id)}
+                                                    className="text-red-500 hover:text-red-600 p-2"
+                                                >
+                                                    <Trash2 className="w-5 h-5" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                // Address Form
+                                <div className="card-glass p-8">
+                                    <h3 className="text-xl font-bold mb-6 flex items-center">
+                                        <MapPin className="w-5 h-5 mr-2 text-hydrogen-500" />
+                                        Delivery Address
+                                    </h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                                        <div className="md:col-span-2">
+                                            <label className="block text-sm font-medium mb-2">Street Address</label>
+                                            <input
+                                                type="text"
+                                                className="input-field w-full"
+                                                placeholder="Industrial Area, Sector 4"
+                                                value={address.street}
+                                                onChange={(e) => setAddress({ ...address, street: e.target.value })}
+                                            />
                                         </div>
                                         <div>
-                                            <h3 className="font-bold text-lg">{item.name}</h3>
-                                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                                                Purity: {item.purity}
-                                            </p>
-                                            <div className="text-green-500 font-bold mt-1">
-                                                ${item.price.toFixed(2)} / kg
-                                            </div>
+                                            <label className="block text-sm font-medium mb-2">City</label>
+                                            <input
+                                                type="text"
+                                                className="input-field w-full"
+                                                placeholder="Mumbai"
+                                                value={address.city}
+                                                onChange={(e) => setAddress({ ...address, city: e.target.value })}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium mb-2">State</label>
+                                            <input
+                                                type="text"
+                                                className="input-field w-full"
+                                                placeholder="Maharashtra"
+                                                value={address.state}
+                                                onChange={(e) => setAddress({ ...address, state: e.target.value })}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium mb-2">Zip Code</label>
+                                            <input
+                                                type="text"
+                                                className="input-field w-full"
+                                                placeholder="400001"
+                                                value={address.zipCode}
+                                                onChange={(e) => setAddress({ ...address, zipCode: e.target.value })}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium mb-2">Country</label>
+                                            <input
+                                                type="text"
+                                                className="input-field w-full"
+                                                value={address.country}
+                                                disabled
+                                            />
                                         </div>
                                     </div>
 
-                                    <div className="flex items-center space-x-6">
-                                        <div className="flex items-center space-x-2">
-                                            <button
-                                                onClick={() => updateQuantity(item.id, (item.quantity || 1) - 1)}
-                                                className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center"
-                                            >
-                                                -
-                                            </button>
-                                            <span className="font-bold w-8 text-center">{item.quantity || 1}</span>
-                                            <button
-                                                onClick={() => updateQuantity(item.id, (item.quantity || 1) + 1)}
-                                                className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center"
-                                            >
-                                                +
-                                            </button>
+                                    <h3 className="text-xl font-bold mb-6 flex items-center">
+                                        <ShieldAlert className="w-5 h-5 mr-2 text-yellow-500" />
+                                        Safety & Access
+                                    </h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div>
+                                            <label className="block text-sm font-medium mb-2">Safety Officer Contact</label>
+                                            <input
+                                                type="text"
+                                                className="input-field w-full"
+                                                placeholder="+91 98765 43210"
+                                                value={address.safetyContact}
+                                                onChange={(e) => setAddress({ ...address, safetyContact: e.target.value })}
+                                            />
                                         </div>
-                                        <div className="text-right min-w-[80px]">
-                                            <div className="font-bold text-lg">
-                                                ${(item.price * (item.quantity || 1)).toFixed(2)}
-                                            </div>
+                                        <div>
+                                            <label className="block text-sm font-medium mb-2">Site Access Code (if any)</label>
+                                            <input
+                                                type="text"
+                                                className="input-field w-full"
+                                                placeholder="GATE-123"
+                                                value={address.siteAccessCode}
+                                                onChange={(e) => setAddress({ ...address, siteAccessCode: e.target.value })}
+                                            />
                                         </div>
-                                        <button
-                                            onClick={() => removeItem(item.id)}
-                                            className="text-red-500 hover:text-red-600 p-2"
-                                        >
-                                            <Trash2 className="w-5 h-5" />
-                                        </button>
                                     </div>
                                 </div>
-                            ))}
+                            )}
                         </div>
 
                         {/* Order Summary */}
@@ -167,13 +296,38 @@ const Cart = () => {
                                     <span>Blockchain Certificate Included</span>
                                 </div>
 
-                                <button
-                                    onClick={handleCheckout}
-                                    className="w-full btn-primary py-3 flex items-center justify-center space-x-2"
-                                >
-                                    <span>Proceed to Checkout</span>
-                                    <ArrowRight className="w-5 h-5" />
-                                </button>
+                                {step === 'cart' ? (
+                                    <button
+                                        onClick={() => setStep('address')}
+                                        className="w-full btn-primary py-3 flex items-center justify-center space-x-2"
+                                    >
+                                        <span>Proceed to Address</span>
+                                        <ArrowRight className="w-5 h-5" />
+                                    </button>
+                                ) : (
+                                    <div className="space-y-3">
+                                        <button
+                                            onClick={handleCheckout}
+                                            disabled={loading || !address.street || !address.city}
+                                            className="w-full btn-primary py-3 flex items-center justify-center space-x-2 disabled:opacity-50"
+                                        >
+                                            {loading ? (
+                                                <span>Processing...</span>
+                                            ) : (
+                                                <>
+                                                    <span>Place Order</span>
+                                                    <CheckCircle className="w-5 h-5" />
+                                                </>
+                                            )}
+                                        </button>
+                                        <button
+                                            onClick={() => setStep('cart')}
+                                            className="w-full py-2 text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                                        >
+                                            Back to Cart
+                                        </button>
+                                    </div>
+                                )}
 
                                 <p className="text-xs text-center text-gray-500">
                                     Secure transaction powered by Smart Contracts
