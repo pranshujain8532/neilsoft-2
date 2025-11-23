@@ -2,9 +2,9 @@ import mongoose from 'mongoose';
 
 const orderSchema = new mongoose.Schema({
     customer: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
+        type: mongoose.Schema.Types.Mixed, // Allow ObjectId or String (for in-memory)
         required: true,
+        ref: 'User',
     },
     product: {
         name: String,
