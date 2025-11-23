@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # SIH2025 Green Hydrogen Production System
 
 A comprehensive, AI-powered platform for managing green hydrogen production, storage, and distribution using renewable energy sources. Built for the Smart India Hackathon 2025.
@@ -236,3 +237,7 @@ Built with ❤️ for India's Green Hydrogen Mission
 - [National Green Hydrogen Mission](https://mnre.gov.in)
 - [India Green Hydrogen Standards](https://mnre.gov.in)
 - Documentation for APIs and models in `/docs`
+=======
+# Neilsoft2025
+SIH2025
+>>>>>>> 6024296fe943d55f9abf55878785183c849e7deb
