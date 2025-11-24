@@ -51,4 +51,9 @@ const orderSchema = new mongoose.Schema({
     timestamps: true,
 });
 
+// Add indexes for performance
+orderSchema.index({ createdAt: -1 });
+orderSchema.index({ status: 1 });
+orderSchema.index({ customer: 1 });
+
 export default mongoose.model('Order', orderSchema);

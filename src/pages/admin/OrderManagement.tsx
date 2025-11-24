@@ -6,8 +6,6 @@ import { Package, Truck, CheckCircle, Clock, MapPin, AlertTriangle, X } from 'lu
 const OrderManagement = () => {
     const [orders, setOrders] = useState<any[]>([]);
     const [selectedOrder, setSelectedOrder] = useState<any>(null);
-    const [showShipModal, setShowShipModal] = useState(false);
-    const [fleet, setFleet] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
@@ -23,14 +21,7 @@ const OrderManagement = () => {
         }
     };
 
-    const fetchFleet = async () => {
-        try {
-            const res = await transportAPI.getFleet();
-            setFleet(res.data.filter((v: any) => v.status === 'idle'));
-        } catch (error) {
-            console.error('Failed to fetch fleet', error);
-        }
-    };
+
 
     const handleStatusUpdate = async (id: string, status: string) => {
         try {
@@ -44,26 +35,22 @@ const OrderManagement = () => {
         }
     };
 
-    const openShipModal = async (order: any) => {
-        setSelectedOrder(order);
-        await fetchFleet();
-        setShowShipModal(true);
-    };
 
-    const assignVehicle = async (vehicleId: string) => {
-        if (!selectedOrder) return;
+
+    const handleSmartDispatch = async (order: any) => {
         setLoading(true);
         try {
-            await transportAPI.assignVehicle({
-                vehicleId,
-                orderId: selectedOrder._id
-            });
-            setShowShipModal(false);
+            const res = await transportAPI.autoAssign({ orderId: order._id });
+
+            const safetyLogStr = res.data.safetyLog ? `\n\nSafety Log:\n${res.data.safetyLog.join('\n')}` : '';
+
+            alert(`Smart Dispatch Successful!\n\nAssigned to: ${res.data.vehicle.driver}\nVehicle: ${res.data.vehicle.registration}\nOrigin Plant: ${res.data.plant?.name || 'Central Hub'}\nDistance: ${res.data.distance}${safetyLogStr}`);
+
             fetchOrders();
-            alert('Vehicle assigned successfully!');
+            setSelectedOrder({ ...order, status: 'in-transit' });
         } catch (error) {
-            console.error('Failed to assign vehicle', error);
-            alert('Failed to assign vehicle');
+            console.error('Smart dispatch failed', error);
+            alert('Failed to dispatch order');
         } finally {
             setLoading(false);
         }
@@ -142,11 +129,16 @@ const OrderManagement = () => {
                                         )}
                                         {selectedOrder.status === 'confirmed' && (
                                             <button
-                                                onClick={() => openShipModal(selectedOrder)}
-                                                className="btn-primary flex items-center space-x-2 bg-purple-600 hover:bg-purple-700"
+                                                onClick={() => handleSmartDispatch(selectedOrder)}
+                                                disabled={loading}
+                                                className="btn-primary flex items-center space-x-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50"
                                             >
-                                                <Truck className="w-4 h-4" />
-                                                <span>Ship Order</span>
+                                                {loading ? (
+                                                    <span className="animate-spin">⌛</span>
+                                                ) : (
+                                                    <Truck className="w-4 h-4" />
+                                                )}
+                                                <span>Smart Dispatch</span>
                                             </button>
                                         )}
                                     </div>
@@ -240,50 +232,6 @@ const OrderManagement = () => {
                 </div>
             </motion.div>
 
-            {/* Ship Modal */}
-            {showShipModal && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="bg-white dark:bg-gray-900 rounded-xl p-6 max-w-lg w-full m-4 border border-gray-200 dark:border-gray-800 shadow-2xl"
-                    >
-                        <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-xl font-bold">Assign Vehicle</h2>
-                            <button onClick={() => setShowShipModal(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full">
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
-
-                        <div className="space-y-4 mb-6 max-h-[400px] overflow-y-auto">
-                            {fleet.length === 0 ? (
-                                <p className="text-center text-gray-500 py-4">No available vehicles found.</p>
-                            ) : (
-                                fleet.map((vehicle) => (
-                                    <div
-                                        key={vehicle._id}
-                                        className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer flex justify-between items-center group"
-                                        onClick={() => assignVehicle(vehicle._id)}
-                                    >
-                                        <div className="flex items-center space-x-3">
-                                            <div className="p-2 bg-gray-100 dark:bg-gray-700 rounded-lg">
-                                                <Truck className="w-5 h-5 text-gray-600 dark:text-gray-300" />
-                                            </div>
-                                            <div>
-                                                <h4 className="font-bold">{vehicle.registration}</h4>
-                                                <p className="text-xs text-gray-500">{vehicle.driver} • {vehicle.capacity}kg Capacity</p>
-                                            </div>
-                                        </div>
-                                        <button className="px-3 py-1 bg-hydrogen-500 text-white text-sm rounded-md opacity-0 group-hover:opacity-100 transition-opacity">
-                                            Assign
-                                        </button>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                    </motion.div>
-                </div>
-            )}
         </div>
     );
 };
