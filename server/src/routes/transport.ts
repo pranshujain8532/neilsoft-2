@@ -524,7 +524,7 @@ router.post('/seed', async (req, res) => {
             const mockFleet = [
                 {
                     registration: 'GJ-01-AB-1234',
-                    driver: 'Rajesh Kumar',
+                    driver: 'Anuj Partani',
                     capacity: 1000,
                     status: 'idle',
                     location: { lat: 23.0225, lng: 72.5714 },
@@ -533,7 +533,7 @@ router.post('/seed', async (req, res) => {
                 },
                 {
                     registration: 'MH-02-CD-5678',
-                    driver: 'Suresh Patil',
+                    driver: 'Akshay Gandu',
                     capacity: 1200,
                     status: 'idle',
                     location: { lat: 19.0760, lng: 72.8777 },
@@ -542,7 +542,7 @@ router.post('/seed', async (req, res) => {
                 },
                 {
                     registration: 'DL-03-EF-9012',
-                    driver: 'Amit Singh',
+                    driver: 'Anshumaan Ahuja',
                     capacity: 800,
                     status: 'maintenance',
                     location: { lat: 28.7041, lng: 77.1025 },
