@@ -319,6 +319,29 @@ router.post('/auto-assign', async (req, res) => {
             const destCity = order?.deliveryAddress?.city || 'Unknown';
             const destState = order?.deliveryAddress?.state || 'India';
 
+            // Resolve coordinates if missing
+            let destLat = order?.deliveryAddress?.lat;
+            let destLng = order?.deliveryAddress?.lng;
+
+            if (!destLat || !destLng) {
+                console.log(`📍 Coordinates missing for ${destCity}, ${destState}. Geocoding...`);
+                try {
+                    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+                    if (apiKey) {
+                        const geoUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(`${destCity}, ${destState}`)}&key=${apiKey}`;
+                        const geoRes = await axios.get(geoUrl);
+                        if (geoRes.data.status === 'OK' && geoRes.data.results?.[0]) {
+                            const location = geoRes.data.results[0].geometry.location;
+                            destLat = location.lat;
+                            destLng = location.lng;
+                            console.log(`✅ Geocoded to: ${destLat}, ${destLng}`);
+                        }
+                    }
+                } catch (geoError) {
+                    console.warn('Geocoding failed:', geoError);
+                }
+            }
+
             // Prepare plant data for ML optimization
             const plantDestinations = plants.map((plant: any) => ({
                 name: plant.name,
@@ -329,28 +352,74 @@ router.post('/auto-assign', async (req, res) => {
                 efficiency: plant.efficiency || 0.85
             }));
 
-            // Call ML service for profit optimization
-            const mlResponse = await axios.post(`${process.env.ML_API_URL || 'http://localhost:5001'}/logistics/optimize-profit`, {
-                origin: { lat: order?.deliveryAddress?.lat || 12.9716, lng: order?.deliveryAddress?.lng || 77.5946 }, // Approximate destination coords
-                destinations: plantDestinations,
-                order_value: order?.totalPrice || 5000,
-                fuel_cost_per_km: 15,
-                driver_cost_per_hour: 200
-            }, { timeout: 3000 });
+            // Only call ML if we have valid coordinates
+            if (destLat && destLng) {
+                // Call ML service for profit optimization
+                const mlResponse = await axios.post(`${process.env.ML_API_URL || 'http://localhost:5001'}/logistics/optimize-profit`, {
+                    origin: { lat: destLat, lng: destLng },
+                    destinations: plantDestinations,
+                    order_value: order?.totalPrice || 5000,
+                    fuel_cost_per_km: 15,
+                    driver_cost_per_hour: 200
+                }, { timeout: 3000 });
 
-            if (mlResponse.data?.selected_plant) {
-                const selectedPlantId = mlResponse.data.selected_plant.plant_id;
-                selectedPlant = plants.find((p: any) => p._id === selectedPlantId || p.name === mlResponse.data.selected_plant.plant_name);
-                console.log(`✅ ML selected plant: ${selectedPlant?.name} (Distance: ${mlResponse.data.selected_plant.distance_km} km, Profit: ₹${mlResponse.data.selected_plant.net_profit})`);
+                if (mlResponse.data?.selected_plant) {
+                    const selectedPlantId = mlResponse.data.selected_plant.plant_id;
+                    selectedPlant = plants.find((p: any) => p._id === selectedPlantId || p.name === mlResponse.data.selected_plant.plant_name);
+                    console.log(`✅ ML selected plant: ${selectedPlant?.name} (Distance: ${mlResponse.data.selected_plant.distance_km} km, Profit: ₹${mlResponse.data.selected_plant.net_profit})`);
+                }
+            } else {
+                console.warn('⚠️ Could not resolve destination coordinates, skipping ML optimization');
             }
+
         } catch (mlError) {
             console.warn('ML service unavailable, using fallback plant selection');
         }
 
-        // Fallback: select first plant if ML fails
+        // Fallback: select nearest plant using Google Maps API if ML fails
         if (!selectedPlant) {
-            selectedPlant = plants[0];
-            console.log(`⚠️ Using fallback plant: ${selectedPlant.name}`);
+            console.log('⚠️ ML selection failed, calculating nearest plant using Google Maps API...');
+
+            try {
+                const destCity = order?.deliveryAddress?.city || 'New Delhi';
+                const destState = order?.deliveryAddress?.state || 'Delhi';
+                const destination = `${destCity}, ${destState}`;
+
+                // Construct origins string from all plants
+                const origins = plants.map((p: any) =>
+                    `${p.location.coordinates.lat},${p.location.coordinates.lng}`
+                ).join('|');
+
+                const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+                if (apiKey) {
+                    const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${origins}&destinations=${destination}&key=${apiKey}`;
+                    const response = await axios.get(url);
+
+                    if (response.data.status === 'OK' && response.data.rows) {
+                        let minDuration = Infinity;
+                        let bestPlantIndex = 0;
+
+                        response.data.rows.forEach((row: any, index: number) => {
+                            const element = row.elements[0];
+                            if (element.status === 'OK' && element.duration.value < minDuration) {
+                                minDuration = element.duration.value;
+                                bestPlantIndex = index;
+                            }
+                        });
+
+                        selectedPlant = plants[bestPlantIndex];
+                        console.log(`✅ Google Maps selected nearest plant: ${selectedPlant.name} (Duration: ${Math.round(minDuration / 60)} mins)`);
+                    }
+                }
+            } catch (apiError) {
+                console.warn('Google Maps Distance Matrix failed:', apiError);
+            }
+
+            // Ultimate fallback if API fails too
+            if (!selectedPlant) {
+                console.warn('⚠️ All selection methods failed, defaulting to first plant');
+                selectedPlant = plants[0];
+            }
         }
 
         const origin = selectedPlant.name;
@@ -380,7 +449,7 @@ router.post('/auto-assign', async (req, res) => {
                 currentOrder: orderId,
                 currentLoad: quantity,
                 location: selectedPlant?.location?.coordinates || { lat: 19.0760, lng: 72.8777 },
-                origin: originAddr,
+                origin: origin, // Use plant name
                 destination: destAddr,
                 eta: eta,
                 progress: 0
@@ -393,7 +462,7 @@ router.post('/auto-assign', async (req, res) => {
             vehicle.currentOrder = orderId;
             vehicle.currentLoad = quantity;
             vehicle.destination = destAddr;
-            vehicle.origin = originAddr;
+            vehicle.origin = origin; // Use plant name
             vehicle.eta = eta;
             vehicle.progress = 0;
             try {
