@@ -15,10 +15,10 @@ if (!global.inMemoryUsers) {
     global.inMemoryUsers = [];
 }
 
-const seedUsers = async () => {
+const seedUsers = () => {
     if (global.inMemoryUsers.length === 0) {
-        const hashedPassword = await bcrypt.hash('admin123', 10);
-        const customerPassword = await bcrypt.hash('user123', 10);
+        const hashedPassword = bcrypt.hashSync('admin123', 10);
+        const customerPassword = bcrypt.hashSync('user123', 10);
 
         global.inMemoryUsers.push({
             _id: 'admin-1',

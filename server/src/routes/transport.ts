@@ -1,6 +1,38 @@
 import express from 'express';
+import axios from 'axios';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
 import Vehicle from '../models/Vehicle.js';
 import Order from '../models/Order.js';
+
+// Helper to get realistic distance and duration using Google Distance Matrix API
+async function getDistanceAndDuration(origin: string, destination: string) {
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+    if (!apiKey) {
+        console.warn('Google Maps API key not set, falling back to mock ETA');
+        return { distance: 'unknown', eta: '4h 30m' };
+    }
+    const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(
+        origin
+    )}&destinations=${encodeURIComponent(destination)}&key=${apiKey}`;
+    try {
+        const res = await axios.get(url);
+        const element = res.data.rows[0].elements[0];
+        if (element.status !== 'OK') {
+            console.warn('Google Maps API returned non-OK status:', element.status);
+            return { distance: 'unknown', eta: '4h 30m' };
+        }
+        const distanceText = element.distance.text;
+        const durationText = element.duration.text;
+        return { distance: distanceText, eta: durationText };
+    } catch (err) {
+        console.error('Error calling Google Maps API:', err);
+        return { distance: 'unknown', eta: '4h 30m' };
+    }
+}
+
 import Plant from '../models/Plant.js';
 import mongoose from 'mongoose';
 
@@ -20,10 +52,19 @@ if (!global.inMemoryVehicles) {
 // Get all vehicles (Fleet)
 router.get('/fleet', async (req, res) => {
     try {
-        let vehicles = await Vehicle.find().populate('currentOrder');
+        let vehicles: any[] = [];
 
-        // If no vehicles found (empty DB), return mock data for visualization
-        if (vehicles.length === 0) {
+        try {
+            vehicles = await Vehicle.find().populate('currentOrder').maxTimeMS(2000);
+        } catch (dbError) {
+            console.warn('Database error fetching vehicles, using in-memory');
+        }
+
+        // Combine DB vehicles with in-memory vehicles for complete fleet view
+        const combinedVehicles = [...vehicles, ...(global.inMemoryVehicles || [])];
+
+        // If STILL no vehicles found at all, return mock data for visualization
+        if (combinedVehicles.length === 0) {
             return res.json([
                 {
                     _id: 'mock-1',
@@ -80,8 +121,6 @@ router.get('/fleet', async (req, res) => {
             ]);
         }
 
-        // Combine DB vehicles with in-memory vehicles for complete fleet view
-        const combinedVehicles = [...vehicles, ...(global.inMemoryVehicles || [])];
         res.json(combinedVehicles);
     } catch (error) {
         console.warn('Database error, returning mock fleet:', error);
@@ -222,14 +261,104 @@ router.post('/auto-assign', async (req, res) => {
 
         if (!plants || plants.length === 0) {
             plants = [
-                { _id: 'mock-plant-1', name: 'Gujarat Solar Plant', status: 'active', location: { coordinates: { lat: 23.0225, lng: 72.5714 } } },
-                { _id: 'mock-plant-2', name: 'Mumbai Green Hub', status: 'active', location: { coordinates: { lat: 19.0760, lng: 72.8777 } } }
+                {
+                    _id: 'mock-plant-1',
+                    name: 'Gujarat Solar Plant',
+                    status: 'active',
+                    location: { coordinates: { lat: 23.0225, lng: 72.5714 } },
+                    productionCost: 1800,
+                    efficiency: 0.88
+                },
+                {
+                    _id: 'mock-plant-2',
+                    name: 'Mumbai Green Hub',
+                    status: 'active',
+                    location: { coordinates: { lat: 19.0760, lng: 72.8777 } },
+                    productionCost: 2100,
+                    efficiency: 0.85
+                },
+                {
+                    _id: 'mock-plant-3',
+                    name: 'Karnataka Green Hub',
+                    status: 'active',
+                    location: { coordinates: { lat: 12.9716, lng: 77.5946 } },
+                    productionCost: 1950,
+                    efficiency: 0.87
+                },
+                {
+                    _id: 'mock-plant-4',
+                    name: 'Tamil Nadu Solar Plant',
+                    status: 'active',
+                    location: { coordinates: { lat: 13.0827, lng: 80.2707 } },
+                    productionCost: 1850,
+                    efficiency: 0.86
+                },
+                {
+                    _id: 'mock-plant-5',
+                    name: 'Delhi-NCR Plant',
+                    status: 'active',
+                    location: { coordinates: { lat: 28.7041, lng: 77.1025 } },
+                    productionCost: 2200,
+                    efficiency: 0.83
+                },
+                {
+                    _id: 'mock-plant-6',
+                    name: 'Rajasthan Desert Plant',
+                    status: 'active',
+                    location: { coordinates: { lat: 26.2389, lng: 73.0243 } },
+                    productionCost: 1750,
+                    efficiency: 0.90
+                }
             ];
         }
 
-        // 3. Select nearest plant (simple logic)
-        const selectedPlant = plants[0];
+        // 3. Use ML service to select optimal plant based on profit, distance, and efficiency
+        let selectedPlant: any = null;
+        try {
+            // Get delivery address coordinates approximation (city, state)
+            const destCity = order?.deliveryAddress?.city || 'Unknown';
+            const destState = order?.deliveryAddress?.state || 'India';
+
+            // Prepare plant data for ML optimization
+            const plantDestinations = plants.map((plant: any) => ({
+                name: plant.name,
+                id: plant._id,
+                lat: plant.location?.coordinates?.lat || 23.0,
+                lng: plant.location?.coordinates?.lng || 72.0,
+                production_cost: plant.productionCost || 2000,
+                efficiency: plant.efficiency || 0.85
+            }));
+
+            // Call ML service for profit optimization
+            const mlResponse = await axios.post(`${process.env.ML_API_URL || 'http://localhost:5001'}/logistics/optimize-profit`, {
+                origin: { lat: order?.deliveryAddress?.lat || 12.9716, lng: order?.deliveryAddress?.lng || 77.5946 }, // Approximate destination coords
+                destinations: plantDestinations,
+                order_value: order?.totalPrice || 5000,
+                fuel_cost_per_km: 15,
+                driver_cost_per_hour: 200
+            }, { timeout: 3000 });
+
+            if (mlResponse.data?.selected_plant) {
+                const selectedPlantId = mlResponse.data.selected_plant.plant_id;
+                selectedPlant = plants.find((p: any) => p._id === selectedPlantId || p.name === mlResponse.data.selected_plant.plant_name);
+                console.log(`✅ ML selected plant: ${selectedPlant?.name} (Distance: ${mlResponse.data.selected_plant.distance_km} km, Profit: ₹${mlResponse.data.selected_plant.net_profit})`);
+            }
+        } catch (mlError) {
+            console.warn('ML service unavailable, using fallback plant selection');
+        }
+
+        // Fallback: select first plant if ML fails
+        if (!selectedPlant) {
+            selectedPlant = plants[0];
+            console.log(`⚠️ Using fallback plant: ${selectedPlant.name}`);
+        }
+
         const origin = selectedPlant.name;
+
+        // Compute realistic origin and destination
+        const originAddr = `${selectedPlant?.location?.coordinates?.lat},${selectedPlant?.location?.coordinates?.lng}`;
+        const destAddr = `${order?.deliveryAddress?.city || 'Unknown'}, ${order?.deliveryAddress?.state || 'India'}`;
+        const { distance, eta } = await getDistanceAndDuration(originAddr, destAddr);
 
         // 4. Find or Create Vehicle
         let vehicle: any = null;
@@ -251,9 +380,9 @@ router.post('/auto-assign', async (req, res) => {
                 currentOrder: orderId,
                 currentLoad: quantity,
                 location: selectedPlant?.location?.coordinates || { lat: 19.0760, lng: 72.8777 },
-                origin: origin,
-                destination: `${order?.deliveryAddress?.city || 'Unknown'}, ${order?.deliveryAddress?.state || 'India'}`,
-                eta: `${Math.floor(Math.random() * 5) + 2}h ${Math.floor(Math.random() * 60)}m`,
+                origin: originAddr,
+                destination: destAddr,
+                eta: eta,
                 progress: 0
             };
             global.inMemoryVehicles.push(vehicle);
@@ -263,9 +392,9 @@ router.post('/auto-assign', async (req, res) => {
             vehicle.status = 'in-transit';
             vehicle.currentOrder = orderId;
             vehicle.currentLoad = quantity;
-            vehicle.destination = `${order?.deliveryAddress?.city || 'Unknown'}, ${order?.deliveryAddress?.state || 'India'}`;
-            vehicle.origin = origin;
-            vehicle.eta = `${Math.floor(Math.random() * 5) + 2}h ${Math.floor(Math.random() * 60)}m`;
+            vehicle.destination = destAddr;
+            vehicle.origin = originAddr;
+            vehicle.eta = eta;
             vehicle.progress = 0;
             try {
                 await vehicle.save();
@@ -298,11 +427,11 @@ router.post('/auto-assign', async (req, res) => {
             message: 'Smart Logistics Assignment Complete',
             vehicle,
             plant: selectedPlant,
-            distance: '50 km',
+            distance,
             safetyLog: [
                 `✅ Plant ${selectedPlant.name} selected`,
                 `🚚 Vehicle ${vehicle.registration} assigned`,
-                `📍 Route: ${origin} → ${order?.deliveryAddress?.city}`
+                `📍 Route: ${originAddr} → ${destAddr}`
             ]
         });
 

@@ -7,8 +7,11 @@ const OrderManagement = () => {
     const [orders, setOrders] = useState<any[]>([]);
     const [selectedOrder, setSelectedOrder] = useState<any>(null);
     const [loading, setLoading] = useState(false);
+    const [fleet, setFleet] = useState<any[]>([]);
 
     useEffect(() => {
+        fetchOrders();
+        fetchFleet();
         fetchOrders();
     }, []);
 
@@ -18,6 +21,16 @@ const OrderManagement = () => {
             setOrders(res.data);
         } catch (error) {
             console.error('Failed to fetch orders', error);
+        }
+    };
+
+    // Fetch fleet (vehicles) from backend
+    const fetchFleet = async () => {
+        try {
+            const res = await transportAPI.getFleet();
+            setFleet(res.data);
+        } catch (err) {
+            console.error('Failed to fetch fleet', err);
         }
     };
 
@@ -47,6 +60,7 @@ const OrderManagement = () => {
             alert(`Smart Dispatch Successful!\n\nAssigned to: ${res.data.vehicle.driver}\nVehicle: ${res.data.vehicle.registration}\nOrigin Plant: ${res.data.plant?.name || 'Central Hub'}\nDistance: ${res.data.distance}${safetyLogStr}`);
 
             fetchOrders();
+            fetchFleet();
             setSelectedOrder({ ...order, status: 'in-transit' });
         } catch (error) {
             console.error('Smart dispatch failed', error);
@@ -103,6 +117,40 @@ const OrderManagement = () => {
                                     </div>
                                 ))}
                             </div>
+                        </div>
+                    </div>
+
+                    {/* Fleet Overview */}
+                    <div className="lg:col-span-1 mt-8">
+                        <h2 className="font-bold mb-4">Current Fleet</h2>
+                        <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+                            {fleet.length === 0 ? (
+                                <p className="text-gray-400">No vehicles available</p>
+                            ) : (
+                                fleet.map((v) => (
+                                    <div
+                                        key={v._id}
+                                        className="p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+                                    >
+                                        <div className="flex justify-between items-center">
+                                            <span className="font-mono text-sm">{v.registration}</span>
+                                            <span
+                                                className={`px-2 py-1 rounded ${v.status === 'in-transit'
+                                                        ? 'bg-purple-500/20 text-purple-500'
+                                                        : v.status === 'idle'
+                                                            ? 'bg-green-500/20 text-green-500'
+                                                            : 'bg-gray-500/20 text-gray-500'
+                                                    }`}
+                                            >
+                                                {v.status}
+                                            </span>
+                                        </div>
+                                        <p className="text-xs text-gray-400 mt-1">
+                                            Driver: {v.driver} | Load: {v.currentLoad || 0} kg
+                                        </p>
+                                    </div>
+                                ))
+                            )}
                         </div>
                     </div>
 

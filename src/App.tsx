@@ -7,14 +7,13 @@ import Login from './pages/Login';
 import Signup from './pages/Signup';
 import OrderManagement from './pages/admin/OrderManagement';
 
-
-
 // Admin Pages
 import AdminDashboard from './pages/admin/Dashboard';
 import PlantMonitoring from './pages/admin/PlantMonitoring';
 import Analytics from './pages/admin/Analytics';
 import LaborManagement from './pages/admin/LaborManagement';
 import EnergyMix from './pages/admin/EnergyMix';
+import Plants from './pages/admin/Plants';
 
 // Transport
 import Transport from './pages/Transport';
@@ -32,7 +31,7 @@ import OrderHistory from './pages/customer/OrderHistory';
 import Navbar from './components/layout/Navbar';
 
 function App() {
-    useTheme(); // Auto dark mode
+    useTheme();
 
     return (
         <Router>
@@ -49,7 +48,8 @@ function App() {
                             <Navbar />
                             <Routes>
                                 <Route path="dashboard" element={<AdminDashboard />} />
-                                <Route path="plants" element={<PlantMonitoring />} />
+                                <Route path="plant-monitoring" element={<PlantMonitoring />} />
+                                <Route path="plants" element={<Plants />} />
                                 <Route path="orders" element={<OrderManagement />} />
                                 <Route path="analytics" element={<Analytics />} />
                                 <Route path="labor" element={<LaborManagement />} />
