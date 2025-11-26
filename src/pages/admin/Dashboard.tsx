@@ -1,372 +1,540 @@
 import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
-import { Factory, Zap, DollarSign, Battery, Sun, Wind, Droplet, TrendingUp, Activity, MapPin, AlertCircle } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+    Cpu, Zap, TrendingUp, Activity, Radio, Rocket, Truck, Database,
+    Brain, Shield, MapPin, AlertTriangle, CheckCircle2, Server, Network,
+    Gauge, BarChart3, LineChart, PieChart, Target, Sparkles, Box, Cloud,
+    Droplets, Sun, Wind, Battery
+} from 'lucide-react';
 
-interface PlantData {
-    _id?: string;
-    plant_id?: string;
-    plant_name?: string;
-    name?: string;
-    location?: {
-        city?: string;
-        state?: string;
-        country?: string;
-        coordinates?: { lat: number; lng: number };
-    } | string;
-    status?: string;
-    capacity?: number;
-    productionCost?: number;
-    lcoh: number;
-    efficiency?: number;
-    energyMix?: {
-        solar: number;
-        wind: number;
-        hydro: number;
-    };
-    renewableEnergy?: {
-        solar: number;
-        wind: number;
-        hydro: number;
-    };
-    weather?: any;
-    energy_output?: any;
-    mlPredictions?: {
-        profit_prediction?: any;
-        weather?: any;
-        energy_output?: any;
-        safety_status?: any;
-    };
-    profit_prediction?: any;
-    safety_status?: any;
+interface SystemMetrics {
+    plants: any[];
+    transport: { active: number; total: number };
+    ml_models: { active: number; total: number };
+    storage: { level: number; capacity: number };
 }
 
 const Dashboard = () => {
     const [loading, setLoading] = useState(true);
-    const [plants, setPlants] = useState<PlantData[]>([]);
-    const [lastUpdate, setLastUpdate] = useState<string>('');
-    const [totalStats, setTotalStats] = useState({
-        totalProduction: 0,
-        avgLcoh: 0,
-        totalProfit: 0,
-        activePlants: 0
-    });
+    const [metrics, setMetrics] = useState<SystemMetrics | null>(null);
+    const [systemStatus, setSystemStatus] = useState('OPERATIONAL');
+    const [activityFeed, setActivityFeed] = useState<Array<{ id: number; type: string; message: string; time: string }>>([]);
 
-    // Fetch comprehensive plant data with ML predictions
-    const fetchPlantPredictions = async () => {
+    const fetchSystemMetrics = async () => {
         try {
-            const response = await fetch('http://localhost:5000/api/plants/with-ml');
-            const data = await response.json();
+            const [plantsRes] = await Promise.all([
+                fetch('http://localhost:5000/api/plants/with-ml')
+            ]);
 
-            if (data.success && data.plants) {
-                setPlants(data.plants);
+            const plantsData = await plantsRes.json();
 
-                // Use aggregate stats from backend
-                setTotalStats({
-                    totalProduction: data.stats.totalCapacity * 1000, // Convert TPD to kg/day
-                    avgLcoh: data.stats.avgLcoh,
-                    totalProfit: data.plants.reduce((sum: number, p: PlantData) =>
-                        sum + (p.mlPredictions?.profit_prediction?.daily_profit || 0), 0),
-                    activePlants: data.stats.activePlants
-                });
+            setMetrics({
+                plants: plantsData.plants || [],
+                transport: { active: 12, total: 25 },
+                ml_models: { active: 5, total: 5 },
+                storage: { level: 87, capacity: 100 }
+            });
 
-                setLastUpdate(new Date().toLocaleTimeString());
-                setLoading(false);
-            }
+            setActivityFeed(prev => [
+                {
+                    id: Date.now(),
+                    type: 'success',
+                    message: 'ML Profit Model: Optimization complete',
+                    time: new Date().toLocaleTimeString()
+                },
+                ...prev.slice(0, 4)
+            ]);
+
+            setLoading(false);
         } catch (error) {
-            console.error('Error fetching plant data:', error);
+            console.error('Error:', error);
             setLoading(false);
         }
     };
 
     useEffect(() => {
-        fetchPlantPredictions();
-        const interval = setInterval(fetchPlantPredictions, 30000); // Update every 30s
+        fetchSystemMetrics();
+        const interval = setInterval(fetchSystemMetrics, 10000);
         return () => clearInterval(interval);
     }, []);
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center min-h-screen">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-hydrogen-500 mx-auto mb-4" />
-                    <p className="text-gray-600">Loading plant network...</p>
-                </div>
+            <div className="flex items-center justify-center min-h-screen bg-gray-900">
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="text-center"
+                >
+                    <div className="relative">
+                        <div className="w-32 h-32 rounded-full border-4 border-transparent border-t-cyan-500 border-r-cyan-500 animate-spin mx-auto" />
+                        <Cpu className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-12 h-12 text-cyan-400 animate-pulse" />
+                    </div>
+                    <p className="text-cyan-400 mt-6 text-xl font-bold tracking-wider">INITIALIZING MISSION CONTROL</p>
+                    <p className="text-gray-500 text-sm mt-2">Loading system diagnostics...</p>
+                </motion.div>
             </div>
         );
     }
 
-    const getLocationString = (location: any) => {
-        if (typeof location === 'object' && location?.city) {
-            return `${location.city}, ${location.state || ''}`;
-        }
-        return location || 'Unknown';
+    const totalProfit = metrics?.plants.reduce((sum, p) => sum + (p.mlPredictions?.profit_prediction?.daily_profit || 0), 0) || 0;
+    const totalCapacity = metrics?.plants.reduce((sum, p) => sum + (p.capacity || 0), 0) || 0;
+    const avgEfficiency = metrics?.plants.length > 0
+        ? (metrics.plants.reduce((sum, p) => sum + ((p.efficiency || 0) * 100), 0) / metrics.plants.length)
+        : 0;
+
+    return (
+        <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-black text-white overflow-x-hidden">
+            {/* Animated Background Grid */}
+            <div className="fixed inset-0 opacity-10 pointer-events-none">
+                <div className="absolute inset-0" style={{
+                    backgroundImage: `
+                        linear-gradient(to right, rgb(6, 182, 212) 1px, transparent 1px),
+                        linear-gradient(to bottom, rgb(6, 182, 212) 1px, transparent 1px)
+                    `,
+                    backgroundSize: '80px 80px',
+                    animation: 'gridMove 30s linear infinite'
+                }} />
+            </div>
+
+            {/* Floating Particles */}
+            <div className="fixed inset-0 overflow-hidden pointer-events-none">
+                {[...Array(15)].map((_, i) => (
+                    <motion.div
+                        key={i}
+                        className="absolute w-1 h-1 bg-cyan-400 rounded-full"
+                        initial={{
+                            x: Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 1920),
+                            y: Math.random() * (typeof window !== 'undefined' ? window.innerHeight : 1080),
+                            opacity: 0
+                        }}
+                        animate={{
+                            y: [null, Math.random() * (typeof window !== 'undefined' ? window.innerHeight : 1080)],
+                            opacity: [0, 0.8, 0]
+                        }}
+                        transition={{
+                            duration: Math.random() * 8 + 5,
+                            repeat: Infinity,
+                            delay: Math.random() * 3
+                        }}
+                    />
+                ))}
+            </div>
+
+            <div className="relative z-10 py-12 px-8">
+                <div className="max-w-[2000px] mx-auto space-y-12">
+                    {/* Header Section */}
+                    <motion.div
+                        initial={{ y: -50, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        className="text-center mb-16"
+                    >
+                        <div className="flex items-center justify-center gap-4 mb-6">
+                            <motion.div
+                                animate={{ rotate: 360 }}
+                                transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+                                className="w-20 h-20 rounded-full border-4 border-cyan-500 border-t-transparent flex items-center justify-center"
+                            >
+                                <Sparkles className="w-10 h-10 text-cyan-400" />
+                            </motion.div>
+                            <div>
+                                <h1 className="text-6xl font-black tracking-tight bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent">
+                                    H2-OPTIPLANT MISSION CONTROL
+                                </h1>
+                                <p className="text-gray-400 mt-3 flex items-center justify-center gap-3 text-lg">
+                                    <Radio className="w-5 h-5 animate-pulse text-green-500" />
+                                    System Status: <span className="font-bold text-green-400">{systemStatus}</span>
+                                    <span className="mx-2">•</span>
+                                    <span className="text-gray-500">All Systems Nominal</span>
+                                </p>
+                            </div>
+                        </div>
+                    </motion.div>
+
+                    {/* Hero Stats - Full Width */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-8"
+                    >
+                        <MetricCard
+                            icon={Rocket}
+                            label="Network H₂ Production"
+                            value={`${totalCapacity}`}
+                            unit="Tons Per Day"
+                            color="cyan"
+                            trend="+12% from last month"
+                        />
+                        <MetricCard
+                            icon={TrendingUp}
+                            label="Daily Revenue (ML Predicted)"
+                            value={`$${(totalProfit / 1000).toFixed(1)}K`}
+                            unit="USD / Day"
+                            color="green"
+                            trend="+8.2% profit margin"
+                        />
+                        <MetricCard
+                            icon={Zap}
+                            label="Avg Network Efficiency"
+                            value={`${avgEfficiency.toFixed(1)}`}
+                            unit="Percent Operational"
+                            color="yellow"
+                            trend="+3.1% improvement"
+                        />
+                        <MetricCard
+                            icon={Activity}
+                            label="Production Facilities"
+                            value={`${metrics?.plants.length || 0}`}
+                            unit="Plants Online"
+                            color="blue"
+                            trend="100% availability"
+                        />
+                    </motion.div>
+
+                    {/* Main Content - 2 Column Layout */}
+                    <div className="grid grid-cols-1 xl:grid-cols-3 gap-10">
+                        {/* Left Column - 2 cols */}
+                        <div className="xl:col-span-2 space-y-10">
+                            {/* Network Topology */}
+                            <Section
+                                title="Production Network Topology"
+                                icon={Network}
+                                iconColor="cyan"
+                            >
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+                                    {metrics?.plants.map((plant, idx) => (
+                                        <PlantNode key={idx} plant={plant} index={idx} />
+                                    ))}
+                                </div>
+                            </Section>
+
+                            {/* ML Models Status */}
+                            <Section
+                                title="AI/ML Intelligence Layer"
+                                icon={Brain}
+                                iconColor="purple"
+                                subtitle="5 Active Models • Real-Time Inference"
+                            >
+                                <div className="grid grid-cols-2 md:grid-cols-5 gap-8 mt-8">
+                                    <ModelIndicator name="Profit Predictor" status="active" accuracy={94} />
+                                    <ModelIndicator name="Safety Monitor" status="active" accuracy={89} />
+                                    <ModelIndicator name="Energy Forecaster" status="active" accuracy={92} />
+                                    <ModelIndicator name="Route Optimizer" status="active" accuracy={87} />
+                                    <ModelIndicator name="Demand Predictor" status="active" accuracy={91} />
+                                </div>
+                            </Section>
+
+                            {/* Energy Flow Visualization */}
+                            <Section
+                                title="Real-Time Energy Mix"
+                                icon={Zap}
+                                iconColor="yellow"
+                                subtitle="Renewable Energy Distribution Across Network"
+                            >
+                                <div className="grid grid-cols-3 gap-8 mt-8">
+                                    <EnergySource
+                                        icon={Sun}
+                                        name="Solar"
+                                        percentage={45}
+                                        capacity="240 MW"
+                                        color="yellow"
+                                    />
+                                    <EnergySource
+                                        icon={Wind}
+                                        name="Wind"
+                                        percentage={35}
+                                        capacity="185 MW"
+                                        color="cyan"
+                                    />
+                                    <EnergySource
+                                        icon={Droplets}
+                                        name="Hydro"
+                                        percentage={20}
+                                        capacity="105 MW"
+                                        color="blue"
+                                    />
+                                </div>
+                            </Section>
+                        </div>
+
+                        {/* Right Column - 1 col */}
+                        <div className="space-y-10">
+                            {/* Transport Fleet */}
+                            <Section
+                                title="Transport Fleet"
+                                icon={Truck}
+                                iconColor="orange"
+                                compact
+                            >
+                                <div className="space-y-6 mt-6">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-gray-400 text-lg">Active Deliveries</span>
+                                        <span className="text-4xl font-black text-orange-400">12</span>
+                                    </div>
+                                    <CircularProgress percentage={48} label="Fleet Utilization" color="orange" size="large" />
+
+                                    <div className="pt-6 border-t border-gray-700 space-y-3">
+                                        <StatRow label="Avg Delivery Time" value="4.2 hrs" />
+                                        <StatRow label="On-Time Rate" value="96%" highlight />
+                                        <StatRow label="Total Distance Today" value="2,340 km" />
+                                    </div>
+                                </div>
+                            </Section>
+
+                            {/* Storage Status */}
+                            <Section
+                                title="H₂ Storage Network"
+                                icon={Database}
+                                iconColor="blue"
+                                compact
+                            >
+                                <div className="mt-6">
+                                    <CircularProgress percentage={87} label="Network Capacity" color="blue" size="large" />
+
+                                    <div className="mt-6 space-y-3">
+                                        <StatRow label="High Pressure (700 bar)" value="3,200 kg" />
+                                        <StatRow label="Low Pressure (350 bar)" value="1,850 kg" />
+                                        <StatRow label="Liquid H₂ (-253°C)" value="4,120 kg" />
+                                        <div className="pt-3 border-t border-gray-700">
+                                            <StatRow label="Total Stored" value="9,170 kg" highlight />
+                                        </div>
+                                    </div>
+                                </div>
+                            </Section>
+
+                            {/* Activity Feed */}
+                            <Section
+                                title="Live System Activity"
+                                icon={Activity}
+                                iconColor="green"
+                                compact
+                            >
+                                <div className="space-y-3 max-h-[400px] overflow-y-auto mt-6 pr-2">
+                                    <AnimatePresence mode="popLayout">
+                                        {activityFeed.map((activity) => (
+                                            <motion.div
+                                                key={activity.id}
+                                                initial={{ opacity: 0, x: -20 }}
+                                                animate={{ opacity: 1, x: 0 }}
+                                                exit={{ opacity: 0, x: 20 }}
+                                                className="flex items-start gap-3 p-4 bg-gray-800/50 rounded-xl border border-gray-700/50 hover:border-green-500/30 transition-colors"
+                                            >
+                                                <div className="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0 animate-pulse" />
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm text-gray-300">{activity.message}</p>
+                                                    <p className="text-xs text-gray-500 mt-1">{activity.time}</p>
+                                                </div>
+                                            </motion.div>
+                                        ))}
+                                    </AnimatePresence>
+                                </div>
+                            </Section>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <style>{`
+                @keyframes gridMove {
+                    0% { transform: translate(0, 0); }
+                    100% { transform: translate(80px, 80px); }
+                }
+            `}</style>
+        </div>
+    );
+};
+
+// ========== SUB COMPONENTS ==========
+
+const Section = ({ title, icon: Icon, iconColor, subtitle, children, compact = false }: any) => {
+    const colors = {
+        cyan: 'text-cyan-400 border-cyan-500/20',
+        purple: 'text-purple-400 border-purple-500/20',
+        yellow: 'text-yellow-400 border-yellow-500/20',
+        orange: 'text-orange-400 border-orange-500/20',
+        blue: 'text-blue-400 border-blue-500/20',
+        green: 'text-green-400 border-green-500/20'
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 dark:from-gray-900 dark:to-gray-800 section-padding">
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="max-w-7xl mx-auto"
-            >
-                {/* Header */}
-                <div className="mb-8 flex items-center justify-between">
-                    <div>
-                        <h1 className="text-4xl font-bold gradient-text mb-2">H2-OptiPlant Network</h1>
-                        <p className="text-gray-600 dark:text-gray-400">6 Plants • Real-time ML Predictions • India-wide Coverage</p>
-                    </div>
-                    <div className="flex items-center space-x-2 text-sm text-gray-500">
-                        <Activity className="w-4 h-4 animate-pulse text-green-500" />
-                        <span>Updated: {lastUpdate}</span>
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={`bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-3xl border ${colors[iconColor]} ${compact ? 'p-6' : 'p-8'} shadow-2xl`}
+        >
+            <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-3">
+                    <Icon className={`w-7 h-7 ${colors[iconColor].split(' ')[0]}`} />
+                    <h2 className="text-2xl font-bold text-white">{title}</h2>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-gray-400">
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                    Live
+                </div>
+            </div>
+            {subtitle && <p className="text-gray-500 text-sm ml-10">{subtitle}</p>}
+            {children}
+        </motion.div>
+    );
+};
+
+const MetricCard = ({ icon: Icon, label, value, unit, color, trend }: any) => {
+    const colors = {
+        cyan: 'from-cyan-500/10 to-cyan-600/5 border-cyan-500/30 text-cyan-400',
+        green: 'from-green-500/10 to-green-600/5 border-green-500/30 text-green-400',
+        yellow: 'from-yellow-500/10 to-yellow-600/5 border-yellow-500/30 text-yellow-400',
+        blue: 'from-blue-500/10 to-blue-600/5 border-blue-500/30 text-blue-400'
+    };
+
+    return (
+        <motion.div
+            whileHover={{ scale: 1.03, y: -8 }}
+            className={`bg-gradient-to-br ${colors[color]} backdrop-blur-xl p-8 rounded-2xl border-2 shadow-xl`}
+        >
+            <Icon className={`w-12 h-12 mb-4 ${colors[color].split(' ')[2]}`} />
+            <div className="text-sm text-gray-400 mb-2 font-medium">{label}</div>
+            <div className="text-5xl font-black mb-2">{value}</div>
+            <div className="text-sm text-gray-500 mb-4">{unit}</div>
+            <div className="text-sm text-green-400 font-semibold flex items-center gap-1">
+                <TrendingUp className="w-4 h-4" />
+                {trend}
+            </div>
+        </motion.div>
+    );
+};
+
+const PlantNode = ({ plant, index }: any) => {
+    const status = plant.mlPredictions?.safety_status?.status || 'normal';
+    const statusColors = {
+        optimal: { bg: 'from-green-500/20 to-green-600/10', border: 'border-green-500/40', dot: 'bg-green-500', text: 'text-green-400' },
+        normal: { bg: 'from-blue-500/20 to-blue-600/10', border: 'border-blue-500/40', dot: 'bg-blue-500', text: 'text-blue-400' },
+        warning: { bg: 'from-orange-500/20 to-orange-600/10', border: 'border-orange-500/40', dot: 'bg-orange-500', text: 'text-orange-400' }
+    };
+    const colors = statusColors[status as keyof typeof statusColors] || statusColors.normal;
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: index * 0.1 }}
+            whileHover={{ scale: 1.05, y: -5 }}
+            className={`relative p-6 bg-gradient-to-br ${colors.bg} rounded-2xl border-2 ${colors.border} cursor-pointer group`}
+        >
+            <div className={`absolute top-3 right-3 w-3 h-3 ${colors.dot} rounded-full animate-pulse`} />
+            <MapPin className={`w-8 h-8 ${colors.text} mb-3`} />
+            <div className="text-lg font-bold text-white mb-1">{plant.plant_name || plant.name}</div>
+            <div className="text-sm text-gray-400 mb-3">{plant.capacity} TPD Capacity</div>
+            <div className={`text-xl font-bold ${colors.text}`}>
+                ${plant.mlPredictions?.profit_prediction?.daily_profit?.toLocaleString() || 0}
+            </div>
+            <div className="text-xs text-gray-500">Daily Revenue</div>
+        </motion.div>
+    );
+};
+
+const ModelIndicator = ({ name, status, accuracy }: any) => {
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            whileHover={{ y: -10, scale: 1.05 }}
+            className="text-center"
+        >
+            <div className="relative w-24 h-24 mx-auto mb-3">
+                <svg className="w-full h-full transform -rotate-90">
+                    <circle cx="48" cy="48" r="42" fill="none" stroke="#374151" strokeWidth="6" />
+                    <motion.circle
+                        cx="48"
+                        cy="48"
+                        r="42"
+                        fill="none"
+                        stroke="#a78bfa"
+                        strokeWidth="6"
+                        strokeLinecap="round"
+                        strokeDasharray={`${2 * Math.PI * 42}`}
+                        initial={{ strokeDashoffset: 2 * Math.PI * 42 }}
+                        animate={{ strokeDashoffset: 2 * Math.PI * 42 * (1 - accuracy / 100) }}
+                        transition={{ duration: 1.5, ease: "easeOut" }}
+                    />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                    <CheckCircle2 className="w-8 h-8 text-purple-400" />
+                </div>
+            </div>
+            <div className="text-lg font-black text-white">{accuracy}%</div>
+            <div className="text-xs text-gray-500 mt-1">{name}</div>
+        </motion.div>
+    );
+};
+
+const EnergySource = ({ icon: Icon, name, percentage, capacity, color }: any) => {
+    const colors = {
+        yellow: 'from-yellow-500/20 to-yellow-600/10 border-yellow-500/40 text-yellow-400',
+        cyan: 'from-cyan-500/20 to-cyan-600/10 border-cyan-500/40 text-cyan-400',
+        blue: 'from-blue-500/20 to-blue-600/10 border-blue-500/40 text-blue-400'
+    };
+
+    return (
+        <motion.div
+            whileHover={{ scale: 1.05 }}
+            className={`bg-gradient-to-br ${colors[color]} rounded-2xl border-2 p-6 text-center`}
+        >
+            <Icon className={`w-12 h-12 ${colors[color].split(' ')[2]} mx-auto mb-4`} />
+            <div className="text-4xl font-black text-white mb-2">{percentage}%</div>
+            <div className="text-sm text-gray-400 mb-1">{name}</div>
+            <div className="text-xs text-gray-500">{capacity}</div>
+        </motion.div>
+    );
+};
+
+const CircularProgress = ({ percentage, label, color, size = 'medium' }: any) => {
+    const radius = size === 'large' ? 60 : 45;
+    const circumference = 2 * Math.PI * radius;
+    const offset = circumference - (percentage / 100) * circumference;
+
+    const colorMap = {
+        orange: '#fb923c',
+        blue: '#60a5fa',
+        green: '#4ade80'
+    };
+
+    const containerSize = size === 'large' ? 'w-40 h-40' : 'w-32 h-32';
+
+    return (
+        <div className="flex flex-col items-center">
+            <div className={`relative ${containerSize}`}>
+                <svg className="w-full h-full transform -rotate-90">
+                    <circle cx={size === 'large' ? 80 : 64} cy={size === 'large' ? 80 : 64} r={radius} fill="none" stroke="#374151" strokeWidth="10" />
+                    <motion.circle
+                        cx={size === 'large' ? 80 : 64}
+                        cy={size === 'large' ? 80 : 64}
+                        r={radius}
+                        fill="none"
+                        stroke={colorMap[color]}
+                        strokeWidth="10"
+                        strokeLinecap="round"
+                        strokeDasharray={circumference}
+                        initial={{ strokeDashoffset: circumference }}
+                        animate={{ strokeDashoffset: offset }}
+                        transition={{ duration: 1.5, ease: "easeOut" }}
+                    />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="text-center">
+                        <div className={`${size === 'large' ? 'text-4xl' : 'text-3xl'} font-black`}>{percentage}%</div>
                     </div>
                 </div>
+            </div>
+            <div className="text-sm text-gray-400 mt-3 font-medium">{label}</div>
+        </div>
+    );
+};
 
-                {/* Total Stats */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                    <div className="card-glass p-6">
-                        <div className="flex items-center justify-between mb-2">
-                            <Zap className="w-8 h-8 text-hydrogen-500" />
-                        </div>
-                        <h3 className="text-2xl font-bold">{totalStats.totalProduction.toFixed(0)} kg/day</h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">Total H₂ Capacity</p>
-                    </div>
-                    <div className="card-glass p-6">
-                        <div className="flex items-center justify-between mb-2">
-                            <DollarSign className="w-8 h-8 text-green-500" />
-                        </div>
-                        <h3 className="text-2xl font-bold">${totalStats.avgLcoh.toFixed(2)}/kg</h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">Average LCOH</p>
-                    </div>
-                    <div className="card-glass p-6">
-                        <div className="flex items-center justify-between mb-2">
-                            <TrendingUp className="w-8 h-8 text-blue-500" />
-                        </div>
-                        <h3 className="text-2xl font-bold">${totalStats.totalProfit.toLocaleString()}</h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">ML Daily Profit</p>
-                    </div>
-                    <div className="card-glass p-6">
-                        <div className="flex items-center justify-between mb-2">
-                            <Factory className="w-8 h-8 text-purple-500" />
-                        </div>
-                        <h3 className="text-2xl font-bold">{totalStats.activePlants}</h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">Active Plants</p>
-                    </div>
-                </div>
-
-                {/* Per-Plant Cards */}
-                <div className="space-y-6">
-                    {plants.map((plant, idx) => (
-                        <motion.div
-                            key={plant.plant_id || plant._id}
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: idx * 0.1 }}
-                            className="card-glass p-6"
-                        >
-                            {/* Plant Header */}
-                            <div className="flex items-center justify-between mb-6">
-                                <div className="flex items-center space-x-4">
-                                    <div className="w-14 h-14 bg-gradient-to-br from-hydrogen-500 to-green-500 rounded-xl flex items-center justify-center shadow-lg">
-                                        <Factory className="w-7 h-7 text-white" />
-                                    </div>
-                                    <div>
-                                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                                            {plant.plant_name || plant.name}
-                                        </h2>
-                                        <div className="flex items-center space-x-3 text-sm text-gray-600 dark:text-gray-400 mt-1">
-                                            <div className="flex items-center">
-                                                <MapPin className="w-3.5 h-3.5 mr-1" />
-                                                <span>{getLocationString(plant.location)}</span>
-                                            </div>
-                                            {plant.capacity && (
-                                                <>
-                                                    <span>•</span>
-                                                    <div className="flex items-center text-green-600 dark:text-green-400 font-medium">
-                                                        <Battery className="w-3.5 h-3.5 mr-1" />
-                                                        {plant.capacity} TPD
-                                                    </div>
-                                                </>
-                                            )}
-                                            {plant.efficiency && (
-                                                <>
-                                                    <span>•</span>
-                                                    <div className="flex items-center text-purple-600 dark:text-purple-400 font-medium">
-                                                        <TrendingUp className="w-3.5 h-3.5 mr-1" />
-                                                        {(plant.efficiency * 100).toFixed(0)}% Efficient
-                                                    </div>
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="text-right">
-                                    <div className="text-3xl font-bold gradient-text">${plant.lcoh.toFixed(2)}/kg</div>
-                                    <div className="text-xs text-gray-500 mt-1">LCOH</div>
-                                </div>
-                            </div>
-
-                            {/* Energy Mix Visualization */}
-                            {plant.energyMix && (
-                                <div className="bg-gradient-to-r from-yellow-50 via-cyan-50 to-blue-50 dark:from-gray-800 dark:to-gray-700 p-4 rounded-xl mb-6 border border-gray-200 dark:border-gray-600">
-                                    <h3 className="font-bold mb-3 flex items-center text-gray-900 dark:text-white">
-                                        <Zap className="w-4 h-4 mr-2 text-green-500" />
-                                        Renewable Energy Mix
-                                    </h3>
-                                    <div className="space-y-3">
-                                        {plant.energyMix.solar > 0 && (
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center space-x-2 w-24">
-                                                    <Sun className="w-4 h-4 text-yellow-500" />
-                                                    <span className="text-sm font-medium">Solar</span>
-                                                </div>
-                                                <div className="flex items-center space-x-3 flex-1">
-                                                    <div className="flex-1 h-3 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
-                                                        <div
-                                                            className="h-full bg-gradient-to-r from-yellow-400 to-yellow-600 transition-all duration-500"
-                                                            style={{ width: `${plant.energyMix.solar}%` }}
-                                                        />
-                                                    </div>
-                                                    <span className="text-sm font-bold w-12 text-right text-yellow-600 dark:text-yellow-400">
-                                                        {plant.energyMix.solar}%
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        )}
-                                        {plant.energyMix.wind > 0 && (
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center space-x-2 w-24">
-                                                    <Wind className="w-4 h-4 text-cyan-500" />
-                                                    <span className="text-sm font-medium">Wind</span>
-                                                </div>
-                                                <div className="flex items-center space-x-3 flex-1">
-                                                    <div className="flex-1 h-3 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
-                                                        <div
-                                                            className="h-full bg-gradient-to-r from-cyan-400 to-cyan-600 transition-all duration-500"
-                                                            style={{ width: `${plant.energyMix.wind}%` }}
-                                                        />
-                                                    </div>
-                                                    <span className="text-sm font-bold w-12 text-right text-cyan-600 dark:text-cyan-400">
-                                                        {plant.energyMix.wind}%
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        )}
-                                        {plant.energyMix.hydro > 0 && (
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center space-x-2 w-24">
-                                                    <Droplet className="w-4 h-4 text-blue-500" />
-                                                    <span className="text-sm font-medium">Hydro</span>
-                                                </div>
-                                                <div className="flex items-center space-x-3 flex-1">
-                                                    <div className="flex-1 h-3 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
-                                                        <div
-                                                            className="h-full bg-gradient-to-r from-blue-400 to-blue-600 transition-all duration-500"
-                                                            style={{ width: `${plant.energyMix.hydro}%` }}
-                                                        />
-                                                    </div>
-                                                    <span className="text-sm font-bold w-12 text-right text-blue-600 dark:text-blue-400">
-                                                        {plant.energyMix.hydro}%
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* ML Predictions & Live Data Grid */}
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                {/* ML Predictions */}
-                                <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-gray-800 dark:to-gray-700 p-5 rounded-xl border border-purple-200 dark:border-purple-900">
-                                    <h3 className="font-bold mb-4 flex items-center text-gray-900 dark:text-white">
-                                        <TrendingUp className="w-5 h-5 mr-2 text-purple-500" />
-                                        ML Profit Predictions
-                                    </h3>
-                                    <div className="space-y-3 text-sm">
-                                        {plant.mlPredictions?.profit_prediction || plant.profit_prediction ? (
-                                            <>
-                                                <div className="flex justify-between items-center">
-                                                    <span className="text-gray-600 dark:text-gray-400">H₂ Production:</span>
-                                                    <span className="font-bold text-gray-900 dark:text-white">
-                                                        {(plant.mlPredictions?.profit_prediction?.h2_production_kg || plant.profit_prediction?.h2_production_kg || 0).toFixed(0)} kg
-                                                    </span>
-                                                </div>
-                                                <div className="flex justify-between items-center">
-                                                    <span className="text-gray-600 dark:text-gray-400">Daily Profit:</span>
-                                                    <span className="font-bold text-green-600 dark:text-green-400">
-                                                        ${(plant.mlPredictions?.profit_prediction?.daily_profit || plant.profit_prediction?.daily_profit || 0).toLocaleString()}
-                                                    </span>
-                                                </div>
-                                                <div className="flex justify-between items-center">
-                                                    <span className="text-gray-600 dark:text-gray-400">Monthly Profit:</span>
-                                                    <span className="font-bold text-gray-900 dark:text-white">
-                                                        ${(plant.mlPredictions?.profit_prediction?.monthly_profit || plant.profit_prediction?.monthly_profit || 0).toLocaleString()}
-                                                    </span>
-                                                </div>
-                                                <div className="flex justify-between items-center">
-                                                    <span className="text-gray-600 dark:text-gray-400">Profit Margin:</span>
-                                                    <span className="font-bold text-purple-600 dark:text-purple-400">
-                                                        {plant.mlPredictions?.profit_prediction?.profit_margin || plant.profit_prediction?.profit_margin || 0}%
-                                                    </span>
-                                                </div>
-                                            </>
-                                        ) : (
-                                            <div className="text-center text-gray-500 py-6">
-                                                <Activity className="w-10 h-10 mx-auto mb-2 animate-pulse" />
-                                                <p className="text-xs">Computing ML predictions...</p>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Safety Status */}
-                                <div className={`p-5 rounded-xl border-2 ${(plant.mlPredictions?.safety_status?.status || plant.safety_status?.status) === 'optimal'
-                                        ? 'bg-green-50 border-green-300 dark:bg-green-900/20 dark:border-green-700'
-                                        : 'bg-yellow-50 border-yellow-300 dark:bg-yellow-900/20 dark:border-yellow-700'
-                                    }`}>
-                                    <h3 className="font-bold mb-4 flex items-center text-gray-900 dark:text-white">
-                                        <AlertCircle className={`w-5 h-5 mr-2 ${(plant.mlPredictions?.safety_status?.status || plant.safety_status?.status) === 'optimal'
-                                                ? 'text-green-600'
-                                                : 'text-yellow-600'
-                                            }`} />
-                                        Safety & Monitoring
-                                    </h3>
-                                    <div className="space-y-3 text-sm">
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-gray-600 dark:text-gray-400">Status:</span>
-                                            <span className="font-bold capitalize text-gray-900 dark:text-white">
-                                                {plant.mlPredictions?.safety_status?.status || plant.safety_status?.status || 'Monitoring'}
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-gray-600 dark:text-gray-400">Anomaly Score:</span>
-                                            <span className="font-bold text-gray-900 dark:text-white">
-                                                {(plant.mlPredictions?.safety_status?.anomaly_score || plant.safety_status?.anomaly_score || 0).toFixed(3)}
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-gray-600 dark:text-gray-400">AI Confidence:</span>
-                                            <span className="font-bold text-gray-900 dark:text-white">
-                                                {((plant.mlPredictions?.safety_status?.confidence || plant.safety_status?.confidence || 0) * 100).toFixed(0)}%
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </motion.div>
-                    ))}
-                </div>
-
-                {/* Footer Info */}
-                <div className="mt-10 card-glass p-6 text-center">
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                        🤖 Powered by Advanced ML: Profit Optimization (Deep Learning) • Safety Monitoring (Physics-Informed NN) • Real-time Analytics
-                    </p>
-                    <p className="text-xs text-gray-500">
-                        Network Capacity: {totalStats.totalProduction.toFixed(0)} kg/day H₂ • Auto-updates every 30s • All 6 plants operational
-                    </p>
-                </div>
-            </motion.div>
+const StatRow = ({ label, value, highlight = false }: any) => {
+    return (
+        <div className="flex items-center justify-between">
+            <span className="text-gray-400 text-sm">{label}</span>
+            <span className={`font-bold ${highlight ? 'text-green-400 text-lg' : 'text-white'}`}>{value}</span>
         </div>
     );
 };

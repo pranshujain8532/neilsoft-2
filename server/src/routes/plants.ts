@@ -176,10 +176,21 @@ router.get('/with-ml', async (req, res) => {
                     };
                 }
 
+                // Merge dynamic energy mix if available
+                let energyMix = plant.energyMix;
+                if (mlPrediction?.current_mix?.mix) {
+                    energyMix = {
+                        solar: mlPrediction.current_mix.mix.solar,
+                        wind: mlPrediction.current_mix.mix.wind,
+                        hydro: mlPrediction.current_mix.mix.hydro
+                    };
+                }
+
                 return {
                     ...plant,
                     plant_id: plant._id,
                     plant_name: plant.name,
+                    energyMix: energyMix, // Override with dynamic mix
                     mlPredictions: mlPrediction || null
                 };
             } catch (mlError) {
