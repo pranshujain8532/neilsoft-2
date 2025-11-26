@@ -26,6 +26,7 @@ async function getDistanceAndDuration(origin: string, destination: string) {
         }
         const distanceText = element.distance.text;
         const durationText = element.duration.text;
+        console.log(`📍 Google Maps API Response: Distance=${distanceText}, Duration=${durationText}`);
         return { distance: distanceText, eta: durationText };
     } catch (err) {
         console.error('Error calling Google Maps API:', err);
