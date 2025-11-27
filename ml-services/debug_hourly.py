@@ -76,7 +76,15 @@ def debug_hourly_update():
         print("Debug update completed successfully")
 
     except Exception as e:
-        print(f"Error in debug update: {e}")
+        print("\n!!! ERROR OCCURRED !!!")
+        print(f"Type: {type(e)}")
+        print(f"Error: {e}")
+        if hasattr(e, 'message'):
+            print(f"Message: {e.message}")
+        if hasattr(e, 'details'):
+            print(f"Details: {e.details}")
+        if hasattr(e, 'hint'):
+            print(f"Hint: {e.hint}")
         import traceback
         traceback.print_exc()
 
