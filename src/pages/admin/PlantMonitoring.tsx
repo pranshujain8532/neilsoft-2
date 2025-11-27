@@ -4,6 +4,7 @@ import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Environment } from '@react-three/drei';
 import { plantAPI, machineAPI } from '@/utils/api';
 import { Activity, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 const PlantMonitoring = () => {
     const [plants, setPlants] = useState<any[]>([]);
@@ -30,14 +31,49 @@ const PlantMonitoring = () => {
     };
 
     const selectPlant = async (plant: any) => {
+        // Unsubscribe from previous plant if any
+        if (selectedPlant) {
+            // Cleanup previous subscription
+        }
+
         setSelectedPlant(plant);
         try {
             const res = await machineAPI.getByPlant(plant._id || plant.id);
             setMachines(res.data || getMockMachines());
+
+            // Subscribe to new plant
+            // Subscribe handled in useEffect
         } catch (error) {
             setMachines(getMockMachines());
         }
     };
+
+
+
+    useEffect(() => {
+        const handleMessage = (payload: any) => {
+            console.log('Plant/Machine update:', payload);
+            if (selectedPlant && (payload.new.plant_id === selectedPlant.id || payload.new.id === selectedPlant.id)) {
+                // Refresh data
+                selectPlant(selectedPlant);
+            }
+        };
+
+        const plantChannel = supabase
+            .channel('public:plants')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'plants' }, handleMessage)
+            .subscribe();
+
+        const machineChannel = supabase
+            .channel('public:machines')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'machines' }, handleMessage)
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(plantChannel);
+            supabase.removeChannel(machineChannel);
+        };
+    }, [selectedPlant]);
 
     const getMockPlants = () => [
         { id: '1', name: 'Gujarat Solar Plant', location: 'Kutch, Gujarat', capacity: '100 TPD', status: 'operational', efficiency: 92 },
@@ -195,7 +231,7 @@ const PlantMonitoring = () => {
                                         <div className="mt-2 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                                             <div
                                                 className={`h-full ${machine.health >= 90 ? 'bg-green-500' :
-                                                        machine.health >= 70 ? 'bg-yellow-500' : 'bg-red-500'
+                                                    machine.health >= 70 ? 'bg-yellow-500' : 'bg-red-500'
                                                     }`}
                                                 style={{ width: `${machine.health}%` }}
                                             />

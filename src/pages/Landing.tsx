@@ -1,92 +1,13 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowRight, Zap, Shield, TrendingUp, Leaf } from 'lucide-react';
-import { useEffect, useRef } from 'react';
-import * as THREE from 'three';
+import SplineBackground from '@/components/SplineBackground';
 
 const Landing = () => {
-    const canvasRef = useRef<HTMLCanvasElement>(null);
-
-    useEffect(() => {
-        if (!canvasRef.current) return;
-
-        // Three.js animated background
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({ canvas: canvasRef.current, alpha: true, antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(window.devicePixelRatio);
-
-        // Create animated particles
-        const particlesGeometry = new THREE.BufferGeometry();
-        const particlesCount = 1000;
-        const posArray = new Float32Array(particlesCount * 3);
-
-        for (let i = 0; i < particlesCount * 3; i++) {
-            posArray[i] = (Math.random() - 0.5) * 10;
-        }
-
-        particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
-
-        const particlesMaterial = new THREE.PointsMaterial({
-            size: 0.015,
-            color: 0x1890ff,
-            transparent: true,
-            opacity: 0.8,
-        });
-
-        const particlesMesh = new THREE.Points(particlesGeometry, particlesMaterial);
-        scene.add(particlesMesh);
-
-        camera.position.z = 3;
-
-        let mouseX = 0;
-        let mouseY = 0;
-
-        const handleMouseMove = (event: MouseEvent) => {
-            mouseX = (event.clientX / window.innerWidth) * 2 - 1;
-            mouseY = -(event.clientY / window.innerHeight) * 2 + 1;
-        };
-
-        window.addEventListener('mousemove', handleMouseMove);
-
-        const animate = () => {
-            requestAnimationFrame(animate);
-
-            particlesMesh.rotation.x += 0.0005;
-            particlesMesh.rotation.y += 0.0005;
-
-            // Mouse interaction
-            particlesMesh.rotation.x += mouseY * 0.0005;
-            particlesMesh.rotation.y += mouseX * 0.0005;
-
-            renderer.render(scene, camera);
-        };
-
-        animate();
-
-        const handleResize = () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        };
-
-        window.addEventListener('resize', handleResize);
-
-        return () => {
-            window.removeEventListener('mousemove', handleMouseMove);
-            window.removeEventListener('resize', handleResize);
-            renderer.dispose();
-        };
-    }, []);
-
     return (
         <div className="relative min-h-screen overflow-hidden">
-            {/* 3D Background */}
-            <canvas
-                ref={canvasRef}
-                className="fixed top-0 left-0 w-full h-full -z-10 opacity-30"
-            />
+            {/* Spline 3D Background with Sunrise Animation */}
+            <SplineBackground />
 
             {/* Hero Section */}
             <section className="section-padding min-h-screen flex items-center justify-center relative">

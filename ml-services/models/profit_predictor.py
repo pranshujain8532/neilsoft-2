@@ -38,7 +38,7 @@ class ProfitPredictor:
             return
             
         model = keras.Sequential([
-            layers.LSTM(128, return_sequences=True, input_shape=(self.sequence_length, 8)),
+            layers.LSTM(128, return_sequences=True, input_shape=(self.sequence_length, 9)),
             layers.Dropout(0.2),
             layers.LSTM(64, return_sequences=False),
             layers.Dropout(0.2),
@@ -60,7 +60,7 @@ class ProfitPredictor:
         """Generate synthetic training data for profit prediction"""
         np.random.seed(42)
         
-        # Features: [production, lcoh, solar%, wind%, hydro%, electricity_cost, h2_price, efficiency]
+        # Features: [production, lcoh, solar%, wind%, hydro%, electricity_cost, h2_price, efficiency, labor_cost]
         X_data = []
         y_data = []
         
@@ -83,9 +83,11 @@ class ProfitPredictor:
                 h2_price = np.random.uniform(3, 6)  # $/kg selling price
                 efficiency = np.random.uniform(0.6, 0.8)  # Electrolyzer efficiency
                 
+                labor_cost = np.random.uniform(500, 2000) # Daily labor cost
+                
                 sequence.append([
                     production, lcoh, solar, wind, hydro,
-                    electricity_cost, h2_price, efficiency
+                    electricity_cost, h2_price, efficiency, labor_cost
                 ])
             
             X_data.append(sequence)
@@ -95,7 +97,9 @@ class ProfitPredictor:
             avg_lcoh = np.mean([s[1] for s in sequence])
             avg_price = np.mean([s[6] for s in sequence])
             
-            profit = (avg_price - avg_lcoh) * avg_production * 1000  # Convert to kg
+            avg_labor = np.mean([s[8] for s in sequence])
+            
+            profit = ((avg_price - avg_lcoh) * avg_production * 1000) - avg_labor  # Daily profit in $
             y_data.append(profit)
         
         X = np.array(X_data)
@@ -177,7 +181,7 @@ class ProfitPredictor:
             lcoh = plant_data.get('lcoh', 2.0)
             
             # Create dummy sequence (in real scenario, use historical data)
-            sequence = np.random.randn(1, self.sequence_length, 8)
+            sequence = np.random.randn(1, self.sequence_length, 9)
             prediction = self.model.predict(sequence, verbose=0)[0][0]
             
             # Denormalize
@@ -188,7 +192,8 @@ class ProfitPredictor:
             lcoh = plant_data.get('lcoh', 2.0)
             h2_price = 4.5  # $/kg market price
             
-            profit = (h2_price - lcoh) * production * 1000  # Daily profit in $
+            labor_cost = plant_data.get('labor_cost', 1000)
+            profit = ((h2_price - lcoh) * production * 1000) - labor_cost  # Daily profit in $
         
         return {
             'predicted_profit': float(profit),

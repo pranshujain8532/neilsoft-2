@@ -1,5 +1,5 @@
 import express from 'express';
-import Machine from '../models/Machine.ts';
+import Machine from '../models/Machine.js';
 
 const router = express.Router();
 

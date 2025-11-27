@@ -1,19 +1,31 @@
-import { Server, Socket } from 'socket.io';
+import { WebSocket } from 'ws';
+import { joinRoom, leaveRoom, broadcastToRoom } from '../websocketUtils.js';
 
-export const setupPlantUpdates = (io: Server, socket: Socket) => {
-    // Subscribe to plant updates
-    socket.on('subscribe:plant', (plantId: string) => {
-        socket.join(`plant:${plantId}`);
-        console.log(`Client ${socket.id} subscribed to plant ${plantId}`);
-    });
-
-    // Unsubscribe from plant updates
-    socket.on('unsubscribe:plant', (plantId: string) => {
-        socket.leave(`plant:${plantId}`);
+/**
+ * Handles plant update subscriptions over a native WebSocket connection.
+ * Expected client messages are JSON strings with a `type` field:
+ *   { type: 'subscribe:plant', plantId: string }
+ *   { type: 'unsubscribe:plant', plantId: string }
+ */
+export const setupPlantUpdates = (socket: WebSocket) => {
+    socket.on('message', (data) => {
+        try {
+            const msg = JSON.parse(data.toString());
+            if (msg.type === 'subscribe:plant' && typeof msg.plantId === 'string') {
+                joinRoom(socket, `plant:${msg.plantId}`);
+                console.log(`Client subscribed to plant ${msg.plantId}`);
+            } else if (msg.type === 'unsubscribe:plant' && typeof msg.plantId === 'string') {
+                leaveRoom(socket, `plant:${msg.plantId}`);
+            }
+        } catch (e) {
+            console.warn('Invalid plant update message', e);
+        }
     });
 };
 
-// Emit plant production update (called from background job)
-export const emitPlantUpdate = (io: Server, plantId: string, data: any) => {
-    io.to(`plant:${plantId}`).emit('plant:update', data);
+/**
+ * Emit a plant production update to all subscribed clients.
+ */
+export const emitPlantUpdate = (plantId: string, data: any) => {
+    broadcastToRoom(`plant:${plantId}`, { event: 'plant:update', data });
 };

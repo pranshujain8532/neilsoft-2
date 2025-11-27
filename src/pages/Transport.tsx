@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { MapPin, TruckIcon, Clock, AlertCircle } from 'lucide-react';
 import { transportAPI } from '@/utils/api';
+import { supabase } from '@/lib/supabase';
 
 const Transport = () => {
     const [fleet, setFleet] = useState<any[]>([]);
@@ -9,15 +10,30 @@ const Transport = () => {
 
     useEffect(() => {
         fetchFleet();
-        // Poll for updates every 30 seconds
-        const interval = setInterval(fetchFleet, 30000);
-        return () => clearInterval(interval);
+
+        const channel = supabase
+            .channel('public:vehicles')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'vehicles' },
+                (payload) => {
+                    console.log('Change received!', payload);
+                    fetchFleet(); // Refresh full list to ensure consistency
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, []);
 
     const fetchFleet = async () => {
         try {
             const res = await transportAPI.getFleet();
-            setFleet(res.data);
+            if (res.data) {
+                setFleet(res.data);
+            }
         } catch (error) {
             console.error('Failed to fetch fleet', error);
         }
@@ -37,8 +53,8 @@ const Transport = () => {
     };
 
     const inTransit = fleet.filter((v) => v.status === 'in-transit').length;
-    const totalCapacity = fleet.reduce((sum, v) => sum + v.capacity, 0);
-    const totalLoad = fleet.reduce((sum, v) => sum + (v.currentLoad || 0), 0);
+    const totalCapacity = fleet.reduce((sum, v) => sum + (v.capacity || 0), 0);
+    const totalLoad = fleet.reduce((sum, v) => sum + (v.current_load || 0), 0);
 
     return (
         <div className="max-w-7xl mx-auto section-padding">
@@ -80,7 +96,7 @@ const Transport = () => {
                                 </span>
                             )}
                         </h3>
-                        <div className="h-96 rounded-lg bg-gray-200 dark:bg-gray-800 overflow-hidden relative">
+                        <div className="w-full h-[400px] bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden relative">
                             <iframe
                                 width="100%"
                                 height="100%"
@@ -88,115 +104,79 @@ const Transport = () => {
                                 loading="lazy"
                                 allowFullScreen
                                 referrerPolicy="no-referrer-when-downgrade"
-                                src={(() => {
-                                    const apiKey = 'AIzaSyDyaStNd9U3Q0BF4tDi-URy8ez19VpN57U';
-                                    if (!selectedVehicle) {
-                                        return `https://www.google.com/maps/embed/v1/view?key=${apiKey}&center=20.5937,78.9629&zoom=5&maptype=satellite`;
-                                    }
-                                    if (selectedVehicle.status === 'in-transit' && selectedVehicle.destination) {
-                                        return `https://www.google.com/maps/embed/v1/directions?key=${apiKey}&origin=${encodeURIComponent(selectedVehicle.origin || 'Mumbai')}&destination=${encodeURIComponent(selectedVehicle.destination)}&mode=driving`;
-                                    }
-                                    const lat = selectedVehicle.location?.lat || 20.5937;
-                                    const lng = selectedVehicle.location?.lng || 78.9629;
-                                    return `https://www.google.com/maps/embed/v1/place?key=${apiKey}&q=${lat},${lng}&zoom=15&maptype=satellite`;
-                                })()}
+                                src={`https://www.google.com/maps/embed/v1/directions?key=AIzaSyDyaStNd9U3Q0BF4tDi-URy8ez19VpN57U&origin=Ahmedabad,Gujarat&destination=${selectedVehicle?.current_route ? selectedVehicle.current_route.split(' to ')[1] || 'Mumbai,Maharashtra' : 'Mumbai,Maharashtra'}&zoom=6&mode=driving`}
                             ></iframe>
 
-                            {!selectedVehicle && (
-                                <div className="absolute bottom-4 left-4 bg-white/90 dark:bg-black/80 p-3 rounded-lg backdrop-blur-sm text-xs max-w-xs">
-                                    <p className="font-bold mb-1">Interactive Fleet Map</p>
-                                    <p>Select a vehicle from the list to view its live route or current location.</p>
+                            {/* Overlay Fleet Markers (Simulated Visuals) */}
+                            <div className="absolute bottom-4 left-4 bg-white/90 dark:bg-black/80 p-4 rounded-lg backdrop-blur-sm text-xs max-w-xs">
+                                <div className="font-bold mb-2">Live Updates</div>
+                                <div className="space-y-2">
+                                    {fleet.filter(v => v.status === 'in-transit').slice(0, 3).map(v => (
+                                        <div key={v.id} className="flex items-center justify-between">
+                                            <div className="flex items-center">
+                                                <span className="w-2 h-2 rounded-full bg-green-500 mr-2 animate-pulse"></span>
+                                                {v.registration}
+                                            </div>
+                                            <span className="text-gray-500">{v.current_route || 'En Route'}</span>
+                                        </div>
+                                    ))}
                                 </div>
-                            )}
+                            </div>
                         </div>
                     </div>
 
                     {/* Fleet List */}
-                    <div className="card-glass p-6">
-                        <h3 className="text-xl font-bold mb-4">Fleet Status</h3>
-                        <div className="space-y-3 max-h-96 overflow-y-auto">
-                            {fleet.length === 0 ? (
-                                <p className="text-center text-gray-500 py-8">No vehicles found in fleet.</p>
-                            ) : (
-                                fleet.map((vehicle) => (
-                                    <motion.div
-                                        key={vehicle._id}
-                                        whileHover={{ scale: 1.02 }}
-                                        onClick={() => setSelectedVehicle(vehicle)}
-                                        className={`p-4 rounded-lg cursor-pointer bg-white/5 hover:bg-white/10 transition-all ${selectedVehicle?._id === vehicle._id ? 'ring-2 ring-hydrogen-500' : ''
-                                            }`}
-                                    >
-                                        <div className="flex items-start justify-between mb-3">
-                                            <div className="flex items-center space-x-2">
-                                                <TruckIcon className="w-5 h-5 text-hydrogen-500" />
-                                                <div>
-                                                    <h4 className="font-bold">{vehicle.registration}</h4>
-                                                    <p className="text-sm text-gray-600 dark:text-gray-400">{vehicle.driver}</p>
-                                                </div>
-                                            </div>
-                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(vehicle.status)}`}>
-                                                {vehicle.status}
-                                            </span>
+                    <div className="space-y-4">
+                        {fleet.map((vehicle) => (
+                            <motion.div
+                                key={vehicle.id}
+                                whileHover={{ scale: 1.02 }}
+                                onClick={() => setSelectedVehicle(vehicle)}
+                                className={`card-glass p-4 cursor-pointer transition-all ${selectedVehicle?.id === vehicle.id ? 'border-hydrogen-500 ring-1 ring-hydrogen-500' : ''
+                                    }`}
+                            >
+                                <div className="flex justify-between items-start mb-4">
+                                    <div className="flex items-center space-x-3">
+                                        <div className={`p-2 rounded-lg ${getStatusColor(vehicle.status)}`}>
+                                            <TruckIcon className="w-6 h-6" />
                                         </div>
-
-                                        <div className="space-y-2 text-sm">
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-gray-600 dark:text-gray-400">Origin:</span>
-                                                <span className="font-medium">{vehicle.origin || 'N/A'}</span>
-                                            </div>
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-gray-600 dark:text-gray-400">Destination:</span>
-                                                <span className="font-medium">{vehicle.destination || 'N/A'}</span>
-                                            </div>
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-gray-600 dark:text-gray-400">Load:</span>
-                                                <span className="font-medium">
-                                                    {vehicle.currentLoad || 0}/{vehicle.capacity} kg
-                                                </span>
-                                            </div>
-                                            {vehicle.status === 'in-transit' && (
-                                                <div className="flex items-center justify-between text-hydrogen-500">
-                                                    <div className="flex items-center space-x-1">
-                                                        <Clock className="w-4 h-4" />
-                                                        <span>ETA:</span>
-                                                    </div>
-                                                    <span className="font-bold">{vehicle.eta || 'Calculating...'}</span>
-                                                </div>
-                                            )}
+                                        <div>
+                                            <h3 className="font-bold text-lg">{vehicle.registration}</h3>
+                                            <p className="text-sm text-gray-500">{vehicle.driver_name || 'No Driver Assigned'}</p>
                                         </div>
+                                    </div>
+                                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(vehicle.status)}`}>
+                                        {vehicle.status}
+                                    </span>
+                                </div>
 
-                                        {/* Progress bar for in-transit vehicles */}
-                                        {vehicle.status === 'in-transit' && (
-                                            <div className="mt-3">
-                                                <div className="flex items-center justify-between text-xs mb-1">
-                                                    <span className="text-gray-500">Progress</span>
-                                                    <span className="font-medium">{vehicle.progress || 0}%</span>
-                                                </div>
-                                                <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                                                    <div
-                                                        className="h-full bg-hydrogen-500"
-                                                        style={{ width: `${vehicle.progress || 0}%` }}
-                                                    />
-                                                </div>
-                                            </div>
-                                        )}
-                                    </motion.div>
-                                ))
-                            )}
-                        </div>
-                    </div>
-                </div>
+                                <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+                                    <div className="flex items-center text-gray-600 dark:text-gray-400">
+                                        <MapPin className="w-4 h-4 mr-2" />
+                                        {vehicle.current_route || vehicle.depot_name || 'Depot'}
+                                    </div>
+                                    <div className="flex items-center text-gray-600 dark:text-gray-400">
+                                        <Clock className="w-4 h-4 mr-2" />
+                                        ETA: {vehicle.eta || (vehicle.status === 'in-transit' ? 'Calculating...' : '-')}
+                                    </div>
+                                </div>
 
-                {/* Alerts */}
-                <div className="mt-8 card-glass p-6">
-                    <h3 className="text-xl font-bold mb-4 flex items-center space-x-2">
-                        <AlertCircle className="w-5 h-5 text-yellow-500" />
-                        <span>Recent Alerts & Delays</span>
-                    </h3>
-                    <div className="space-y-2">
-                        <div className="p-3 bg-yellow-500/10 rounded-lg text-sm">
-                            <span className="font-medium">System:</span> Real-time fleet tracking active.
-                        </div>
+                                {vehicle.status === 'in-transit' && (
+                                    <div>
+                                        <div className="flex justify-between text-xs mb-1">
+                                            <span>Load: {vehicle.current_load} kg</span>
+                                            <span>{Math.round((vehicle.current_load / vehicle.capacity) * 100)}% Capacity</span>
+                                        </div>
+                                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                            <div
+                                                className="bg-hydrogen-500 h-2 rounded-full transition-all duration-500"
+                                                style={{ width: `${(vehicle.current_load / vehicle.capacity) * 100}%` }}
+                                            ></div>
+                                        </div>
+                                    </div>
+                                )}
+                            </motion.div>
+                        ))}
                     </div>
                 </div>
             </motion.div>

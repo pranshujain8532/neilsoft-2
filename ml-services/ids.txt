@@ -1,0 +1,22 @@
+[
+  {
+    "id": "d599596e-f03d-4770-9fb0-f134ded1f324",
+    "name": "Gujarat Solar Plant"
+  },
+  {
+    "id": "30fed4e7-7063-429a-aa1e-d232e658c6f6",
+    "name": "Gujarat Solar Plant"
+  },
+  {
+    "id": "08c71141-2a0a-443f-9f36-28ff7af904b1",
+    "name": "Tamil Nadu Wind Plant"
+  },
+  {
+    "id": "038f2d60-9f92-426c-b3b1-b03ba557aaf1",
+    "name": "Tamil Nadu Wind Plant"
+  },
+  {
+    "id": "36be253f-0058-4f94-b804-63dd4c3d506f",
+    "name": "Maharashtra Hydro Plant"
+  }
+]

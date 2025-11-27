@@ -18,6 +18,7 @@ from routes.logistics import logistics_bp
 try:
     from services.weather_service import weather_service
     from services.realtime_ml_service import realtime_ml_service
+    from services.logistics_service import logistics_service
     REALTIME_ENABLED = True
 except ImportError as e:
     print(f"⚠️  Real-time services not available: {e}")
@@ -80,20 +81,6 @@ def get_weather_by_coords():
     """Get weather data by coordinates"""
     if not REALTIME_ENABLED:
         return jsonify({'error': 'Real-time services not available'}), 503
-    
-    lat = float(request.args.get('lat', 23.0))
-    lon = float(request.args.get('lon', 72.0))
-    weather = weather_service.get_weather_by_coordinates(lat, lon)
-    return jsonify(weather)
-
-# Real-time ML endpoints
-@app.route('/api/realtime/start', methods=['POST'])
-def start_realtime():
-    """Start real-time ML updates"""
-    if not REALTIME_ENABLED:
-        return jsonify({'error': 'Real-time services not available'}), 503
-    
-    realtime_ml_service.start()
     return jsonify({'message': 'Real-time ML service started', 'interval': 10})
 
 @app.route('/api/realtime/stop', methods=['POST'])
@@ -254,7 +241,9 @@ if __name__ == '__main__':
     # Start real-time ML service
     if REALTIME_ENABLED:
         realtime_ml_service.start()
+        logistics_service.start()
         print("✅ Real-time ML service started")
+        print("✅ Logistics service started")
         
         # Test weather API
         weather_test = weather_service.test_api_key()

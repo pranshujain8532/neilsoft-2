@@ -51,7 +51,9 @@ const Signup = () => {
                 navigate('/shop');
             }
         } catch (err: any) {
-            setError(err.response?.data?.message || 'Registration failed. Please try again.');
+            console.error('Signup error:', err);
+            const errorMessage = err.message || err.error_description || 'Registration failed. Please try again.';
+            setError(errorMessage);
         } finally {
             setLoading(false);
         }

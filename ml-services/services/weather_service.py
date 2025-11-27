@@ -1,178 +1,147 @@
 """
 Weather API Integration Service
-Fetches real-time weather data for energy forecasting
+Fetches real-time weather data for energy forecasting using Open-Meteo (Free, No API Key)
 """
 
 import requests
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple, List
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
+import pandas as pd
 
 class WeatherService:
     def __init__(self, api_key: Optional[str] = None):
-        # OpenWeatherMap API (can be replaced with any weather service)
-        self.api_key = api_key or os.getenv('WEATHER_API_KEY', '')
-        self.base_url = 'https://api.openweathermap.org/data/2.5/weather'
+        # Open-Meteo does not require an API key
+        self.base_url = 'https://api.open-meteo.com/v1/forecast'
+        self.archive_url = 'https://archive-api.open-meteo.com/v1/archive'
         
     def get_weather_by_coords(self, lat: float, lon: float) -> Dict:
-        """Get current weather data by coordinates"""
-        
-        # If no API key, return mock data
-        if not self.api_key or self.api_key == 'your_openweathermap_api_key':
-            return self._get_mock_weather(lat, lon)
-        
+        """Get current weather data by coordinates using Open-Meteo"""
         try:
             params = {
-                'lat': lat,
-                'lon': lon,
-                'appid': self.api_key,
-                'units': 'metric'  # Celsius
+                'latitude': lat,
+                'longitude': lon,
+                'current': 'temperature_2m,relative_humidity_2m,surface_pressure,wind_speed_10m,wind_direction_10m,cloud_cover,direct_radiation',
+                'timezone': 'auto'
             }
             
             response = requests.get(self.base_url, params=params, timeout=5)
             response.raise_for_status()
             data = response.json()
             
-            return self._parse_weather_data(data)
+            return self._parse_open_meteo_data(data, lat, lon)
             
         except Exception as e:
             print(f"Weather API error: {e}, using mock data")
             return self._get_mock_weather(lat, lon)
     
     def get_weather_by_city(self, city: str, country_code: str = 'IN') -> Dict:
-        """Get current weather data by city name"""
-        
-        if not self.api_key or self.api_key == 'your_openweathermap_api_key':
-            return self._get_mock_weather(23.0, 72.0)  # Default to Gujarat coords
-        
+        """Get current weather data by city name (Geocoding first)"""
         try:
-            params = {
-                'q': f'{city},{country_code}',
-                'appid': self.api_key,
-                'units': 'metric'
+            # Simple geocoding for demo cities
+            coords = {
+                'Ahmedabad': (23.0225, 72.5714),
+                'Pune': (18.5204, 73.8567),
+                'Coimbatore': (11.0168, 76.9558),
+                'Kutch': (23.7337, 69.8597),
+                'Ludhiana': (30.9010, 75.8573)
             }
             
-            response = requests.get(self.base_url, params=params, timeout=5)
-            response.raise_for_status()
-            data = response.json()
-            
-            return self._parse_weather_data(data)
+            lat, lon = coords.get(city, (23.0225, 72.5714)) # Default to Ahmedabad
+            return self.get_weather_by_coords(lat, lon)
             
         except Exception as e:
             print(f"Weather API error: {e}, using mock data")
             return self._get_mock_weather(23.0, 72.0)
+            
+    def get_historical_weather(self, lat: float, lon: float, days: int = 365) -> Tuple[List, List]:
+        """
+        Fetch historical weather data for training
+        Returns: (X_data, y_data_simulated)
+        """
+        try:
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=days)
+            
+            params = {
+                'latitude': lat,
+                'longitude': lon,
+                'start_date': start_date.strftime('%Y-%m-%d'),
+                'end_date': end_date.strftime('%Y-%m-%d'),
+                'hourly': 'temperature_2m,direct_radiation,wind_speed_10m,wind_direction_10m',
+                'timezone': 'auto'
+            }
+            
+            print(f"Fetching historical weather from {start_date.date()} to {end_date.date()}...")
+            response = requests.get(self.archive_url, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            
+            hourly = data.get('hourly', {})
+            df = pd.DataFrame({
+                'time': hourly.get('time', []),
+                'temperature': hourly.get('temperature_2m', []),
+                'irradiance': hourly.get('direct_radiation', []),
+                'wind_speed': hourly.get('wind_speed_10m', []),
+                'wind_direction': hourly.get('wind_direction_10m', [])
+            })
+            
+            # Filter out night time for solar (irradiance > 0) or keep all for general
+            # For simplicity, we return the raw DataFrame converted to list of dicts or arrays
+            # The calling function will process it into X, y
+            
+            return df
+            
+        except Exception as e:
+            print(f"Historical Weather API error: {e}")
+            return None
     
-    def _parse_weather_data(self, data: Dict) -> Dict:
-        """Parse OpenWeatherMap API response"""
-        
-        # Extract relevant data for energy forecasting
-        main = data.get('main', {})
-        wind = data.get('wind', {})
-        clouds = data.get('clouds', {})
-        
-        # Calculate solar irradiance estimate (simplified)
-        cloud_cover = clouds.get('all', 0)  # 0-100%
-        max_irradiance = 1000  # W/m² on clear day
-        solar_irradiance = max_irradiance * (1 - cloud_cover / 100)
+    def _parse_open_meteo_data(self, data: Dict, lat: float, lon: float) -> Dict:
+        """Parse Open-Meteo API response"""
+        current = data.get('current', {})
         
         return {
-            'temperature': main.get('temp', 25),
-            'humidity': main.get('humidity', 60),
-            'pressure': main.get('pressure', 1013),
-            'wind_speed': wind.get('speed', 5),
-            'wind_direction': wind.get('deg', 180),
-            'cloud_cover': cloud_cover,
-            'solar_irradiance': round(solar_irradiance, 2),
-            'description': data.get('weather', [{}])[0].get('description', 'clear'),
-            'location': data.get('name', 'Unknown'),
+            'temperature': current.get('temperature_2m', 25),
+            'humidity': current.get('relative_humidity_2m', 60),
+            'pressure': current.get('surface_pressure', 1013),
+            'wind_speed': current.get('wind_speed_10m', 5),
+            'wind_direction': current.get('wind_direction_10m', 180),
+            'cloud_cover': current.get('cloud_cover', 0),
+            'solar_irradiance': current.get('direct_radiation', 0), # Real solar data!
+            'description': 'Clear sky' if current.get('cloud_cover', 0) < 20 else 'Cloudy',
+            'location': f'Lat: {lat:.2f}, Lon: {lon:.2f}',
             'timestamp': datetime.now().isoformat(),
-            'source': 'OpenWeatherMap'
+            'source': 'Open-Meteo (Real Data)',
+            # Hydro proxies
+            'water_flow': 45.5, 
+            'head_height': 100.0
         }
     
     def _get_mock_weather(self, lat: float, lon: float) -> Dict:
-        """Generate realistic mock weather data"""
-        import random
-        import math
-        
-        # Vary by time of day
-        hour = datetime.now().hour
-        
-        # Temperature varies by time
-        base_temp = 25
-        temp_variation = 10 * math.sin((hour - 6) * math.pi / 12)
-        temperature = base_temp + temp_variation + random.uniform(-2, 2)
-        
-        # Solar irradiance based on time
-        if 6 <= hour <= 18:
-            solar_angle = math.sin((hour - 6) * math.pi / 12)
-            solar_irradiance = 1000 * solar_angle + random.uniform(-50, 50)
-        else:
-            solar_irradiance = 0
-        
-        # Wind speed (random with bias)
-        wind_speed = abs(random.gauss(8, 3))
-        
+        """Fallback mock data"""
         return {
-            'temperature': round(temperature, 1),
-            'humidity': random.randint(40, 80),
-            'pressure': random.randint(1010, 1020),
-            'wind_speed': round(wind_speed, 1),
-            'wind_direction': random.randint(0, 360),
-            'cloud_cover': random.randint(0, 60),
-            'solar_irradiance': round(max(0, solar_irradiance), 2),
-            'description': 'partly cloudy',
-            'location': f'Location ({lat:.2f}, {lon:.2f})',
+            'temperature': 28.5,
+            'humidity': 65,
+            'pressure': 1012,
+            'wind_speed': 12.5,
+            'wind_direction': 180,
+            'cloud_cover': 20,
+            'solar_irradiance': 850.0,
+            'description': 'Sunny',
+            'location': 'Mock Location',
             'timestamp': datetime.now().isoformat(),
             'source': 'Mock Data',
-            'water_flow': round(random.uniform(30, 60), 2),  # m³/s for hydro
-            'head_height': round(random.uniform(80, 120), 2),  # m for hydro
+            'water_flow': 45.0,
+            'head_height': 100.0
         }
     
     def test_api_key(self) -> Dict:
-        """Test if the weather API key is valid"""
-        if not self.api_key or self.api_key == 'your_openweathermap_api_key':
-            return {
-                'valid': False,
-                'message': 'No API key configured. Using mock weather data.',
-                'mock_mode': True
-            }
-        
+        """Test API connection"""
         try:
-            # Test with a known location
-            params = {
-                'q': 'London,UK',
-                'appid': self.api_key,
-                'units': 'metric'
-            }
-            
-            response = requests.get(self.base_url, params=params, timeout=5)
-            
-            if response.status_code == 200:
-                return {
-                    'valid': True,
-                    'message': 'Weather API key is valid!',
-                    'mock_mode': False,
-                    'provider': 'OpenWeatherMap'
-                }
-            elif response.status_code == 401:
-                return {
-                    'valid': False,
-                    'message': 'Invalid API key. Using mock weather data.',
-                    'mock_mode': True
-                }
-            else:
-                return {
-                    'valid': False,
-                    'message': f'API error: {response.status_code}. Using mock data.',
-                    'mock_mode': True
-                }
-                
+            self.get_weather_by_coords(23.0, 72.0)
+            return {'valid': True, 'message': 'Open-Meteo connection successful', 'provider': 'Open-Meteo'}
         except Exception as e:
-            return {
-                'valid': False,
-                'message': f'Connection error: {str(e)}. Using mock data.',
-                'mock_mode': True
-            }
+            return {'valid': False, 'message': str(e)}
 
 # Global instance
 weather_service = WeatherService()

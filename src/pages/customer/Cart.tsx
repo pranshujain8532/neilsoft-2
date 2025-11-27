@@ -66,23 +66,20 @@ const Cart = () => {
         setLoading(true);
 
         try {
-            // Create order via API
+            // Create order via API - match Supabase schema
+            const totalQuantity = cart.reduce((acc, item) => acc + (item.quantity || 1), 0);
+            const totalAmount = total * 1.05 + 50;
+
+            // Format delivery address as text
+            const deliveryAddressText = `${address.street}, ${address.city}, ${address.state} ${address.zipCode}, ${address.country}`;
+
             const orderData = {
-                customer: user._id || user.id, // Handle both formats
-                product: {
-                    name: cart[0].name,
-                    purity: cart[0].purity,
-                    quantity: cart.reduce((acc, item) => acc + (item.quantity || 1), 0),
-                    pricePerKg: cart[0].price,
-                },
-                totalAmount: total * 1.05 + 50,
-                deliveryAddress: address,
+                customer_id: user.id, // Use user.id from Supabase auth
+                quantity: totalQuantity,
                 status: 'pending',
-                certificate: {
-                    tokenId: `BLK-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
-                    carbonIntensity: 0.8,
-                    energyMix: { solar: 60, wind: 30, hydro: 10 }
-                }
+                delivery_address: deliveryAddressText,
+                total_price: totalAmount,
+                delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days from now
             };
 
             await orderAPI.create(orderData);
@@ -96,7 +93,7 @@ const Cart = () => {
             navigate('/orders');
         } catch (error: any) {
             console.error('Checkout failed:', error);
-            alert(`Failed to place order: ${error.response?.data?.error || error.message}`);
+            alert(`Failed to place order: ${error.message || 'Unknown error'}`);
         } finally {
             setLoading(false);
         }

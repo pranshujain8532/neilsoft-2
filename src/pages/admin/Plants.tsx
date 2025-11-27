@@ -1,34 +1,28 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Sun, Wind, Droplets, MapPin, Activity, Wrench, XCircle, TrendingUp, Zap } from 'lucide-react';
+import { Activity, Wrench, XCircle, MapPin, TrendingUp, Zap } from 'lucide-react';
 import { plantAPI } from '@/utils/api';
 
 interface Plant {
-    _id: string;
+    id: string;
     name: string;
     location: {
-        city: string;
-        state: string;
-        coordinates: {
+        city?: string;
+        state?: string;
+        coordinates?: {
             lat: number;
             lng: number;
         };
     };
     capacity: number;
-    currentProduction: number;
+    current_production?: number;
     status: string;
-    energySources: {
-        solar: { installed: number; current: number };
-        wind: { installed: number; current: number };
-        hydro: { installed: number; current: number };
-    };
-    totalEnergyCapacity: number;
-    currentEnergyMix: {
-        solar: number;
-        wind: number;
-        hydro: number;
-    };
-    lcoh: number;
+    efficiency?: number;
+    created_at?: string;
+    latitude?: number;
+    longitude?: number;
+    capacity_mw?: number;
+    efficiency_percent?: number;
 }
 
 const Plants = () => {
@@ -42,36 +36,34 @@ const Plants = () => {
     const fetchPlants = async () => {
         try {
             const response = await plantAPI.getAll();
-            setPlants(response.data);
+            if (response.data) {
+                // Map DB fields to UI fields if necessary
+                const mappedPlants = response.data.map((p: any) => ({
+                    ...p,
+                    capacity: p.capacity_mw || p.capacity,
+                    efficiency: p.efficiency_percent || p.efficiency,
+                    location: {
+                        city: p.name.split(' ')[0], // Simple inference
+                        state: 'India',
+                        coordinates: {
+                            lat: p.latitude || 23.0,
+                            lng: p.longitude || 72.0
+                        }
+                    }
+                }));
+                setPlants(mappedPlants);
+            }
         } catch (error) {
             console.error('Error fetching plants:', error);
-            // Fallback mock data
-            setPlants([
-                {
-                    _id: '1',
-                    name: 'Gujarat Solar Plant',
-                    location: { city: 'Ahmedabad', state: 'Gujarat', coordinates: { lat: 23.0225, lng: 72.5714 } },
-                    capacity: 50,
-                    currentProduction: 42,
-                    status: 'active',
-                    energySources: {
-                        solar: { installed: 25, current: 22 },
-                        wind: { installed: 10, current: 8 },
-                        hydro: { installed: 0, current: 0 }
-                    },
-                    totalEnergyCapacity: 35,
-                    currentEnergyMix: { solar: 73, wind: 27, hydro: 0 },
-                    lcoh: 1.8
-                }
-            ]);
         } finally {
             setLoading(false);
         }
     };
 
     const getStatusIcon = (status: string) => {
-        switch (status) {
+        switch (status.toLowerCase()) {
             case 'active':
+            case 'operational':
                 return <Activity className="w-5 h-5 text-green-500" />;
             case 'maintenance':
                 return <Wrench className="w-5 h-5 text-yellow-500" />;
@@ -83,10 +75,11 @@ const Plants = () => {
     const getStatusBadge = (status: string) => {
         const styles = {
             active: 'bg-green-500/20 text-green-500 border-green-500',
+            operational: 'bg-green-500/20 text-green-500 border-green-500',
             maintenance: 'bg-yellow-500/20 text-yellow-500 border-yellow-500',
             offline: 'bg-red-500/20 text-red-500 border-red-500'
         };
-        return styles[status as keyof typeof styles] || styles.offline;
+        return styles[status.toLowerCase() as keyof typeof styles] || styles.offline;
     };
 
     if (loading) {
@@ -115,82 +108,55 @@ const Plants = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {plants.map((plant, index) => (
                         <motion.div
-                            key={plant._id}
+                            key={plant.id}
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: index * 0.1 }}
-                            className="card-glass p-6 hover:scale-105 transition-transform cursor-pointer"
+                            className="card-glass p-6 hover:border-hydrogen-500 transition-colors"
                         >
-                            {/* Plant Header */}
                             <div className="flex justify-between items-start mb-4">
                                 <div>
-                                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-1">
-                                        {plant.name}
-                                    </h3>
-                                    <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
+                                    <h3 className="text-xl font-bold mb-1">{plant.name}</h3>
+                                    <div className="flex items-center text-sm text-gray-500">
                                         <MapPin className="w-4 h-4 mr-1" />
-                                        {plant.location.city}, {plant.location.state}
+                                        <span>{plant.location.city}, {plant.location.state}</span>
                                     </div>
                                 </div>
-                                <div className={`px-3 py-1 rounded-full border text-xs font-medium flex items-center gap-1 ${getStatusBadge(plant.status)}`}>
+                                <div className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusBadge(plant.status)} flex items-center gap-2`}>
                                     {getStatusIcon(plant.status)}
                                     {plant.status}
                                 </div>
                             </div>
 
-                            {/* Production Stats */}
-                            <div className="mb-4">
-                                <div className="flex justify-between text-sm mb-2">
-                                    <span className="text-gray-600 dark:text-gray-300">Production</span>
-                                    <span className="font-semibold text-gray-900 dark:text-white">
-                                        {plant.currentProduction}/{plant.capacity} TPD
-                                    </span>
-                                </div>
-                                <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                                    <div
-                                        className="h-full bg-gradient-to-r from-hydrogen-500 to-green-500"
-                                        style={{ width: `${(plant.currentProduction / plant.capacity) * 100}%` }}
-                                    ></div>
-                                </div>
-                            </div>
-
-                            {/* Energy Mix */}
-                            <div className="mb-4">
-                                <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">Energy Mix</p>
-                                <div className="flex gap-3">
-                                    {plant.currentEnergyMix.solar > 0 && (
-                                        <div className="flex items-center gap-1 text-sm">
-                                            <Sun className="w-4 h-4 text-yellow-500" />
-                                            <span className="text-gray-900 dark:text-white">{plant.currentEnergyMix.solar}%</span>
-                                        </div>
-                                    )}
-                                    {plant.currentEnergyMix.wind > 0 && (
-                                        <div className="flex items-center gap-1 text-sm">
-                                            <Wind className="w-4 h-4 text-blue-500" />
-                                            <span className="text-gray-900 dark:text-white">{plant.currentEnergyMix.wind}%</span>
-                                        </div>
-                                    )}
-                                    {plant.currentEnergyMix.hydro > 0 && (
-                                        <div className="flex items-center gap-1 text-sm">
-                                            <Droplets className="w-4 h-4 text-cyan-500" />
-                                            <span className="text-gray-900 dark:text-white">{plant.currentEnergyMix.hydro}%</span>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Key Metrics */}
-                            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                            <div className="space-y-4">
                                 <div>
-                                    <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">LCOH</p>
-                                    <p className="text-lg font-bold text-hydrogen-500">${plant.lcoh}/kg</p>
+                                    <div className="flex justify-between text-sm mb-1">
+                                        <span className="text-gray-500">Production</span>
+                                        <span className="font-medium">{plant.current_production || 0}/{plant.capacity} TPD</span>
+                                    </div>
+                                    <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full bg-hydrogen-500"
+                                            style={{ width: `${((plant.current_production || 0) / plant.capacity) * 100}%` }}
+                                        />
+                                    </div>
                                 </div>
-                                <div>
-                                    <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Capacity</p>
-                                    <p className="text-lg font-bold text-green-500 flex items-center gap-1">
-                                        <Zap className="w-4 h-4" />
-                                        {plant.totalEnergyCapacity} MW
-                                    </p>
+
+                                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                                    <div>
+                                        <p className="text-xs text-gray-500 mb-1">Efficiency</p>
+                                        <div className="flex items-center">
+                                            <TrendingUp className="w-4 h-4 text-blue-500 mr-1" />
+                                            <p className="text-xl font-bold text-blue-500">{plant.efficiency || 0}%</p>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-gray-500 mb-1">Capacity</p>
+                                        <div className="flex items-center">
+                                            <Zap className="w-4 h-4 text-green-500 mr-1" />
+                                            <p className="text-xl font-bold text-green-500">{plant.capacity} TPD</p>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </motion.div>

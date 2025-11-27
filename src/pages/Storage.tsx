@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import { storageAPI } from '@/utils/api';
+import { supabase } from '@/lib/supabase';
 import * as THREE from 'three';
 import { AlertTriangle, Thermometer, Gauge } from 'lucide-react';
 
@@ -46,28 +47,48 @@ function StorageContainer({ position, fillLevel, temperature, status }: any) {
         </group>
     );
 }
-
 const Storage = () => {
     const [containers, setContainers] = useState<any[]>([]);
     const [selectedContainer, setSelectedContainer] = useState<any>(null);
 
-    useEffect(() => {
-        fetchContainers();
-        const interval = setInterval(fetchContainers, 5000); // Faster updates for demo
-        return () => clearInterval(interval);
-    }, []);
-
     const fetchContainers = async () => {
         try {
-            const response = await fetch('http://localhost:5001/api/storage/health');
-            const result = await response.json();
-            if (result.success && result.data.containers) {
-                setContainers(result.data.containers);
+            const { data } = await storageAPI.getContainers();
+            if (data) {
+                setContainers(data);
             }
         } catch (error) {
             console.error('Error fetching storage health:', error);
         }
     };
+
+    useEffect(() => {
+        fetchContainers();
+
+        const channel = supabase
+            .channel('public:containers')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'containers' },
+                (payload) => {
+                    console.log('Container change received!', payload);
+                    if (payload.eventType === 'INSERT') {
+                        setContainers((prev) => [...prev, payload.new]);
+                    } else if (payload.eventType === 'UPDATE') {
+                        setContainers((prev) =>
+                            prev.map((c) => (c.id === payload.new.id ? { ...c, ...payload.new } : c))
+                        );
+                    } else if (payload.eventType === 'DELETE') {
+                        setContainers((prev) => prev.filter((c) => c.id !== payload.old.id));
+                    }
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, []);
 
     const getStatusColor = (status: string) => {
         switch (status) {

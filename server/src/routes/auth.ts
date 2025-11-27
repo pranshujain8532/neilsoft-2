@@ -75,7 +75,7 @@ router.post('/signup', async (req: any, res: any) => {
             const token = jwt.sign(
                 { id: user._id, role: user.role },
                 process.env.JWT_SECRET || 'your-secret-key',
-                { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+                { expiresIn: process.env.JWT_EXPIRES_IN || '7d' } as any
             );
 
             return res.status(201).json({
@@ -119,7 +119,7 @@ router.post('/signup', async (req: any, res: any) => {
             const token = jwt.sign(
                 { id: user._id, role: user.role },
                 process.env.JWT_SECRET || 'your-secret-key',
-                { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+                { expiresIn: process.env.JWT_EXPIRES_IN || '7d' } as any
             );
 
             return res.status(201).json({
@@ -169,7 +169,7 @@ router.post('/login', async (req: any, res: any) => {
         const token = jwt.sign(
             { id: user._id, role: user.role },
             process.env.JWT_SECRET || 'your-secret-key',
-            { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+            { expiresIn: process.env.JWT_EXPIRES_IN || '7d' } as any
         );
 
         res.json({

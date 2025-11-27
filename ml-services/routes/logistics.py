@@ -170,3 +170,25 @@ def optimize_profit():
         return jsonify({'error': 'Order value must be greater than 0'}), 400
     result = optimizer.optimize_with_profit(origin, destinations, order_value, fuel_cost, driver_cost)
     return jsonify(result), 200
+
+@logistics_bp.route('/optimize-order', methods=['POST'])
+def optimize_order():
+    """Optimize plant and vehicle selection for a new order"""
+    try:
+        data = request.json
+        if not data:
+            return jsonify({'error': 'Order details required'}), 400
+            
+        # Import here to avoid circular imports if any, or just standard import
+        from services.logistics_service import logistics_service
+        
+        recommendation = logistics_service.optimize_order_fulfillment(data)
+        
+        if recommendation:
+            return jsonify({'success': True, 'recommendation': recommendation})
+        else:
+            return jsonify({'success': False, 'message': 'No suitable plant or vehicle found. Please check fleet availability.'}), 200
+            
+    except Exception as e:
+        print(f"Error in optimize_order: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500

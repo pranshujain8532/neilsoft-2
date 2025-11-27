@@ -55,53 +55,105 @@ class EnergyForecaster:
         print("✅ Energy forecasting models built")
     
     def generate_training_data_solar(self, num_samples=1000):
-        """Generate solar training data"""
-        np.random.seed(42)
+        """Generate solar training data using real historical weather"""
+        from services.weather_service import weather_service
         
+        print("   Fetching historical weather data for Solar training...")
+        # Fetch data for a sunny location (e.g., Gujarat)
+        df = weather_service.get_historical_weather(23.0225, 72.5714, days=365)
+        
+        if df is not None and not df.empty:
+            # Filter for daylight hours (irradiance > 0)
+            df = df[df['irradiance'] > 0]
+            
+            # Sample if we have more data than needed
+            if len(df) > num_samples:
+                df = df.sample(n=num_samples, random_state=42)
+            
+            X = df[['irradiance', 'temperature']].values
+            # Add hour of day
+            hours = pd.to_datetime(df['time']).dt.hour.values.reshape(-1, 1)
+            X = np.hstack((X, hours))
+            
+            # Calculate target power (y) using physics formula
+            # P = η * A * G
+            y = []
+            for i in range(len(X)):
+                irradiance = X[i][0]
+                hour = X[i][2]
+                
+                hour_factor = np.sin((hour - 6) * np.pi / 12) if 6 <= hour <= 18 else 0
+                power = 0.18 * irradiance * hour_factor / 100  # Normalized to MW
+                y.append(power)
+                
+            return np.array(X), np.array(y)
+            
+        else:
+            print("   Failed to fetch real data, falling back to synthetic generation")
+            return self._generate_synthetic_solar(num_samples)
+
+    def _generate_synthetic_solar(self, num_samples):
+        """Fallback synthetic data generator"""
+        np.random.seed(42)
         X = []
         y = []
-        
         for _ in range(num_samples):
-            # Irradiance (W/m²), Temperature (°C), Hour of day
             irradiance = np.random.uniform(0, 1000)
             temp = np.random.uniform(15, 40)
             hour = np.random.randint(0, 24)
-            
-            # Solar power calculation: P = η * A * G
-            # η = efficiency (~18%), A = area (implicit in capacity), G = irradiance
             hour_factor = np.sin((hour - 6) * np.pi / 12) if 6 <= hour <= 18 else 0
-            power = 0.18 * irradiance * hour_factor / 100  # Normalized to MW
-            
+            power = 0.18 * irradiance * hour_factor / 100
             X.append([irradiance, temp, hour])
             y.append(power)
-        
         return np.array(X), np.array(y)
     
     def generate_training_data_wind(self, num_samples=1000):
-        """Generate wind training data"""
-        np.random.seed(43)
+        """Generate wind training data using real historical weather"""
+        from services.weather_service import weather_service
         
+        print("   Fetching historical weather data for Wind training...")
+        # Fetch data for a windy location (e.g., Kutch)
+        df = weather_service.get_historical_weather(23.7337, 69.8597, days=365)
+        
+        if df is not None and not df.empty:
+            if len(df) > num_samples:
+                df = df.sample(n=num_samples, random_state=43)
+                
+            X = df[['wind_speed', 'wind_direction', 'temperature']].values
+            
+            y = []
+            for i in range(len(X)):
+                wind_speed = X[i][0]
+                
+                # Wind power: P = 0.5 * ρ * A * v³ * Cp
+                if wind_speed < 3:
+                    power = 0
+                elif wind_speed > 20:
+                    power = 0
+                else:
+                    power = 0.4 * (wind_speed ** 3) / 100
+                y.append(power)
+                
+            return np.array(X), np.array(y)
+        else:
+            print("   Failed to fetch real data, falling back to synthetic generation")
+            return self._generate_synthetic_wind(num_samples)
+
+    def _generate_synthetic_wind(self, num_samples):
+        """Fallback synthetic data generator"""
+        np.random.seed(43)
         X = []
         y = []
-        
         for _ in range(num_samples):
-            # Wind speed (m/s), Direction (degrees), Temperature
             wind_speed = np.random.uniform(0, 25)
             direction = np.random.uniform(0, 360)
             temp = np.random.uniform(-10, 35)
-            
-            # Wind power: P = 0.5 * ρ * A * v³ * Cp
-            # Simplified: cubic relationship with wind speed
-            if wind_speed < 3:  # Cut-in speed
-                power = 0
-            elif wind_speed > 20:  # Cut-out speed
+            if wind_speed < 3 or wind_speed > 20:
                 power = 0
             else:
-                power = 0.4 * (wind_speed ** 3) / 100  # Normalized
-            
+                power = 0.4 * (wind_speed ** 3) / 100
             X.append([wind_speed, direction, temp])
             y.append(power)
-        
         return np.array(X), np.array(y)
     
     def generate_training_data_hydro(self, num_samples=1000):
