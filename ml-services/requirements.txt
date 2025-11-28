@@ -1,27 +1,3 @@
-flask
-flask-cors
-python-dotenv
-scipy
-
-# Data Processing
-numpy
-pandas
-matplotlib
-seaborn
-
-# NLP for Chatbot
-transformers
-langchain
-sentence-transformers
-
-# Google Generative AI (for chatbot)
-google-generativeai
-
-# Utilities
-flask-socketio
-requests
-python-socketio
-eventlet
-
-# Testing
-pytest
+version https://git-lfs.github.com/spec/v1
+oid sha256:4ca6733edf006a06436027192977b75052e04e41bbb3e5591abffa65f4c1dd91
+size 317
