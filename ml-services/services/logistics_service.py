@@ -114,8 +114,8 @@ class LogisticsService:
     def optimize_order_fulfillment(self, order_details):
         """Select best plant for order using ML recommender"""
         try:
-            # Fetch all active plants
-            response = supabase.table('plants').select('*').eq('status', 'active').execute()
+            # Fetch all operational plants
+            response = supabase.table('plants').select('*').eq('status', 'operational').execute()
             plants = response.data
             
             if not plants:
