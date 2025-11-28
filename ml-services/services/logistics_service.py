@@ -112,59 +112,101 @@ class LogisticsService:
             return None, None
 
     def optimize_order_fulfillment(self, order_details):
-        """Select best plant for order using ML recommender"""
+        """Select best plant for order using HYBRID ML recommender (60% rule + 40% ML)"""
         try:
             # Fetch all operational plants
             response = supabase.table('plants').select('*').eq('status', 'operational').execute()
             plants = response.data
             
             if not plants:
+                print("⚠️ No operational plants found")
                 return None
 
-            # Import here to avoid circular imports
+            # Import the HYBRID plant recommender
             from models.plant_recommender import plant_recommender
             
-            # Convert Supabase plant data to format expected by recommender
+            # Convert Supabase plant data to format expected by hybrid recommender
             formatted_plants = []
             for p in plants:
-                formatted_plants.append({
-                    '_id': p['id'],
+                # Fetch latest production data for LCOH if available
+                try:
+                    prod_response = supabase.table('production_history')\
+                        .select('lcoh')\
+                        .eq('plant_id', p['id'])\
+                        .order('timestamp', desc=True)\
+                        .limit(1)\
+                        .execute()
+                    
+                    lcoh = prod_response.data[0]['lcoh'] if prod_response.data else 2.0
+                except:
+                    lcoh = 2.0
+                
+                # Build energy sources data (with defaults if not available)
+                energy_sources = p.get('energy_sources', {})
+                formatted_plant = {
+                    'id': p['id'],
+                    '_id': p['id'],  # For backward compatibility
                     'name': p['name'],
-                    'capacity': p.get('capacity_mw', 50), # TPD approximation
+                    'capacity': p.get('capacity_mw', 50),  # TPD or MW
                     'location': {
                         'coordinates': {
                             'lat': p.get('latitude', 0),
                             'lng': p.get('longitude', 0)
                         }
                     },
-                    'lcoh': 2.5, # Default if not in DB
-                    'status': p['status']
-                })
+                    'lcoh': lcoh,
+                    'status': p['status'],
+                    'energySources': {
+                        'solar': {'current': energy_sources.get('solar', 0)},
+                        'wind': {'current': energy_sources.get('wind', 0)},
+                        'hydro': {'current': energy_sources.get('hydro', 0)}
+                    },
+                    'totalEnergyCapacity': p.get('capacity_mw', 50)
+                }
+                formatted_plants.append(formatted_plant)
 
-            # Get recommendations
-            recommendations = plant_recommender.recommend_plants(formatted_plants, order_details, top_n=1)
+            print(f"🔍 Analyzing {len(formatted_plants)} plants using HYBRID recommender...")
+            print(f"   Method: 60% Rule-Based + 40% TensorFlow ML")
+            
+            # Get recommendations using HYBRID scoring
+            recommendations = plant_recommender.recommend_plants(
+                formatted_plants, 
+                order_details, 
+                top_n=1
+            )
             
             if recommendations:
                 selected_plant = recommendations[0]
                 
+                print(f"✅ Selected: {selected_plant['plant_name']}")
+                print(f"   Hybrid Score: {selected_plant['hybrid_score']:.3f}")
+                print(f"   - Rule-based: {selected_plant['rule_based_score']:.3f} (60%)")
+                print(f"   - ML Score: {selected_plant.get('ml_score', 'N/A')} (40%)")
+                
                 # Find nearest idle vehicle
-                # For simplicity, just find any idle vehicle, but ideally calculate distance to plant
                 response = supabase.table('vehicles').select('*').eq('status', 'idle').execute()
                 vehicles = response.data
                 
                 selected_vehicle = None
                 if vehicles:
-                    selected_vehicle = vehicles[0] # Pick the first one for now
+                    selected_vehicle = vehicles[0]  # Pick first idle vehicle
+                    print(f"🚚 Assigned vehicle: {selected_vehicle.get('registration')}")
+                else:
+                    print("⚠️ No idle vehicles available")
                 
                 return {
                     'plant': selected_plant,
-                    'vehicle': selected_vehicle
+                    'vehicle': selected_vehicle,
+                    'optimization_method': 'hybrid_ml_60_40'
                 }
             
+            print("⚠️ No suitable plant found")
             return None
 
         except Exception as e:
-            print(f"Error optimizing order: {e}")
+            print(f"❌ Error optimizing order: {e}")
+            import traceback
+            traceback.print_exc()
             return None
 
 # Global instance
