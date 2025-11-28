@@ -8,6 +8,10 @@
     --foreground: 222.2 84% 4.9%;
   }
 
+  body {
+    @apply overflow-x-hidden;
+  }
+
   /* Glassmorphism utility */
   .glass {
     @apply bg-white/10 backdrop-blur-md border border-white/20;

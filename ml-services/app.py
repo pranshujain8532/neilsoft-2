@@ -10,9 +10,11 @@ import time
 load_dotenv()
 
 # Import blueprints
+from flasgger import Swagger
 from routes.predictions import predictions_bp
 from routes.chatbot import chatbot_bp
 from routes.logistics import logistics_bp
+from predictive_maintenance import maintenance_bp
 
 # Import services
 try:
@@ -27,11 +29,13 @@ except ImportError as e:
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+swagger = Swagger(app)
 
 # Register blueprints
 app.register_blueprint(predictions_bp, url_prefix='/predict')
 app.register_blueprint(chatbot_bp, url_prefix='/chat')
 app.register_blueprint(logistics_bp, url_prefix='/logistics')
+app.register_blueprint(maintenance_bp, url_prefix='/ml/maintenance')
 
 @app.route('/')
 def home():
@@ -177,6 +181,29 @@ def models_status():
     }
     
     return jsonify(status)
+
+@app.route('/metrics', methods=['GET'])
+def get_metrics():
+    """
+    Get system metrics for dashboard
+    ---
+    responses:
+      200:
+        description: System metrics
+    """
+    import psutil
+    import time
+    
+    return jsonify({
+        'latency': [{'time': time.strftime('%H:%M:%S'), 'value': 25 + (time.time() % 10)}],
+        'requests': [{'hour': '12:00', 'count': 150}],
+        'system': {
+            'cpu': psutil.cpu_percent(),
+            'memory': psutil.virtual_memory().percent,
+            'uptime': 'Running',
+            'version': '2.0.0'
+        }
+    })
 
 # New Advanced ML Endpoints
 @app.route('/api/energy/optimization', methods=['GET'])

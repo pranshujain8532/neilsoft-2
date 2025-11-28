@@ -192,3 +192,39 @@ def optimize_order():
     except Exception as e:
         print(f"Error in optimize_order: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@logistics_bp.route('/explain-plant-recommendation', methods=['POST'])
+def explain_plant_recommendation():
+    """
+    Explain why a plant was recommended using SHAP values
+    ---
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            plant:
+              type: object
+            order:
+              type: object
+    responses:
+      200:
+        description: SHAP explanation
+    """
+    try:
+        data = request.json
+        plant = data.get('plant')
+        order = data.get('order')
+        
+        if not plant or not order:
+            return jsonify({'error': 'Plant and Order details required'}), 400
+            
+        from models.plant_recommender import plant_recommender
+        explanation = plant_recommender.explain_prediction(plant, order)
+        
+        return jsonify(explanation)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

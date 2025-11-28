@@ -53,6 +53,14 @@ const Navbar = () => {
                                         <TruckIcon size={18} />
                                         <span>Transport</span>
                                     </Link>
+                                    <Link to="/maintenance" className="navbar-link flex items-center space-x-1">
+                                        <TruckIcon size={18} />
+                                        <span>Maintenance</span>
+                                    </Link>
+                                    <Link to="/admin/metrics" className="navbar-link flex items-center space-x-1">
+                                        <LayoutDashboard size={18} />
+                                        <span>Metrics</span>
+                                    </Link>
                                     <Link to="/admin/orders" className="navbar-link flex items-center space-x-1">
                                         <Package size={18} />
                                         <span>Orders</span>

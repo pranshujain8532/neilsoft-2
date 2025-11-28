@@ -29,3 +29,10 @@ export const setupFleetUpdates = (socket: WebSocket) => {
 export const emitFleetUpdate = (vehicleId: string, data: any) => {
     broadcastToRoom('fleet:updates', { event: 'fleet:position', vehicleId, data });
 };
+
+/**
+ * Emit a maintenance alert to all subscribed clients.
+ */
+export const emitMaintenanceAlert = (vehicleId: string, alert: any) => {
+    broadcastToRoom('fleet:updates', { event: 'maintenance:alert', vehicleId, alert });
+};

@@ -359,7 +359,76 @@ class HybridPlantRecommender:
             print(f"✅ ML model loaded from {self.model_path}")
         except Exception as e:
             print(f"⚠️  Could not load ML model: {e}")
+            print(f"✅ ML model loaded from {self.model_path}")
+        except Exception as e:
+            print(f"⚠️  Could not load ML model: {e}")
             self.build_ml_model()
+
+    def explain_prediction(self, plant: Dict, order: Dict) -> Dict:
+        """Explain prediction using SHAP values"""
+        if not HAS_TF or not self.ml_model:
+            return {"error": "ML model not available"}
+        
+        try:
+            import shap
+            
+            # Prepare input features (single sample)
+            order_qty = order.get('quantity', 1000)
+            order_priority = order.get('priority', 0.5)
+            plant_capacity = plant.get('capacity', 50) * 1000
+            plant_lcoh = plant.get('lcoh', 2.0)
+            
+            if plant.get('location', {}).get('coordinates') and order.get('delivery_location', {}).get('coordinates'):
+                distance = self.calculate_distance(
+                    plant['location']['coordinates'],
+                    order['delivery_location']['coordinates']
+                )
+            else:
+                distance = 500
+            
+            energy_mix = plant.get('energySources', {})
+            total_renewable = (energy_mix.get('solar', {}).get('current', 0) + 
+                             energy_mix.get('wind', {}).get('current', 0) + 
+                             energy_mix.get('hydro', {}).get('current', 0))
+            total_capacity = plant.get('totalEnergyCapacity', 100)
+            renewable_pct = (total_renewable / total_capacity * 100) if total_capacity > 0 else 0
+            
+            features = np.array([[order_qty, order_priority, plant_capacity, plant_lcoh, distance, renewable_pct]])
+            
+            # Normalize
+            if self.scaler_params:
+                features = (features - self.scaler_params.get('X_mean', 0)) / self.scaler_params.get('X_std', 1)
+            
+            # Use KernelExplainer with a small background dataset (e.g. zeros or mean)
+            # For speed, we use a small background summary
+            background = np.zeros((10, 6)) # Placeholder background
+            explainer = shap.KernelExplainer(self.ml_model.predict, background)
+            shap_values = explainer.shap_values(features, nsamples=100)
+            
+            feature_names = ['Order Qty', 'Priority', 'Capacity', 'LCOH', 'Distance', 'Renewable %']
+            
+            # Format explanation
+            explanation = []
+            # shap_values is a list for multi-output, or array for single output
+            vals = shap_values[0][0] if isinstance(shap_values, list) else shap_values[0]
+            
+            for i, name in enumerate(feature_names):
+                explanation.append({
+                    "feature": name,
+                    "importance": float(vals[i]),
+                    "value": float(features[0][i])
+                })
+            
+            # Sort by absolute importance
+            explanation.sort(key=lambda x: abs(x['importance']), reverse=True)
+            
+            return {"features": explanation}
+            
+        except ImportError:
+            return {"error": "SHAP library not installed"}
+        except Exception as e:
+            print(f"SHAP explanation error: {e}")
+            return {"error": str(e)}
 
 
 # Create global instance

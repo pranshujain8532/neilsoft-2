@@ -14,6 +14,7 @@ import transportRoutes from './routes/transport.js';
 import storageRoutes from './routes/storage.js';
 import orderRoutes from './routes/orders.js';
 import certificateRoutes from './routes/certificates.js';
+import maintenanceRoutes from './routes/maintenance.js';
 
 // Socket handlers (native WebSocket)
 import { setupPlantUpdates } from './socketHandlers/plantUpdates.js';
@@ -60,6 +61,7 @@ app.use('/api/transport', transportRoutes);
 app.use('/api/storage', storageRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/certificates', certificateRoutes);
+app.use('/api/maintenance', maintenanceRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

@@ -1,15 +1,65 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+
 import { MapPin, TruckIcon, Clock, AlertCircle } from 'lucide-react';
 import { transportAPI } from '@/utils/api';
 import { supabase } from '@/lib/supabase';
-
+import RouteSimulator from '@/components/RouteSimulator';
 const Transport = () => {
     const [fleet, setFleet] = useState<any[]>([]);
     const [selectedVehicle, setSelectedVehicle] = useState<any>(null);
+    const [isSimulatorOpen, setIsSimulatorOpen] = useState(false);
+
+    // Refresh ETA for selected vehicle
+    useEffect(() => {
+        if (!selectedVehicle || selectedVehicle.status !== 'in-transit') return;
+
+        const updateETA = async () => {
+            const origin = selectedVehicle.origin || selectedVehicle.depot_name || 'Unknown';
+            const destination = selectedVehicle.destination || selectedVehicle.current_route?.split(' to ')[1] || 'Unknown';
+
+            if (origin !== 'Unknown' && destination !== 'Unknown') {
+                const eta = await calculateETA(origin, destination);
+                if (eta.duration !== 'Unknown') {
+                    setSelectedVehicle((prev: any) => ({ ...prev, eta: eta.duration }));
+                }
+            }
+        };
+
+        updateETA(); // Run immediately
+        const interval = setInterval(updateETA, 60000); // 1 minute
+
+        return () => clearInterval(interval);
+    }, [selectedVehicle]);
 
     useEffect(() => {
         fetchFleet();
+
+        // Connect to WebSocket
+        import('@/websocket').then(({ connect, subscribeFleet, unsubscribeFleet }) => {
+            connect();
+            setTimeout(subscribeFleet, 500); // Wait for connection
+
+            const handleMessage = (e: any) => {
+                const msg = e.detail;
+                if (msg.event === 'maintenance:alert') {
+                    console.log('Maintenance Alert:', msg.alert);
+                    // Show toast or alert
+                    const alertDiv = document.createElement('div');
+                    alertDiv.className = 'fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-xl z-50 animate-bounce';
+                    alertDiv.innerHTML = `<strong>⚠️ Maintenance Alert</strong><br/>Vehicle ${msg.vehicleId} needs attention!`;
+                    document.body.appendChild(alertDiv);
+                    setTimeout(() => alertDiv.remove(), 5000);
+                }
+            };
+
+            window.addEventListener('ws:message', handleMessage);
+
+            return () => {
+                unsubscribeFleet();
+                window.removeEventListener('ws:message', handleMessage);
+            };
+        });
 
         const channel = supabase
             .channel('public:vehicles')
@@ -32,7 +82,13 @@ const Transport = () => {
         try {
             const res = await transportAPI.getFleet();
             if (res.data) {
-                setFleet(res.data);
+                // Ensure vehicles have necessary props
+                const vehicles = res.data.map((v: any) => ({
+                    ...v,
+                    origin: v.origin || 'Gujarat Solar Plant', // Default if missing
+                    destination: v.destination
+                }));
+                setFleet(vehicles);
             }
         } catch (error) {
             console.error('Failed to fetch fleet', error);
@@ -57,12 +113,24 @@ const Transport = () => {
     const totalLoad = fleet.reduce((sum, v) => sum + (v.current_load || 0), 0);
 
     return (
-        <div className="max-w-7xl mx-auto section-padding">
+        <div className="max-w-7xl mx-auto section-padding overflow-x-hidden">
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
             >
-                <h1 className="text-4xl font-bold gradient-text mb-8">Transport & Logistics</h1>
+                <div className="flex justify-between items-center mb-8">
+                    <h1 className="text-4xl font-bold gradient-text">Transport & Logistics</h1>
+                    <div className="flex gap-3">
+
+                        <button
+                            onClick={() => setIsSimulatorOpen(true)}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/30 flex items-center gap-2"
+                        >
+                            <MapPin className="w-4 h-4" />
+                            Route Simulator
+                        </button>
+                    </div>
+                </div>
 
                 {/* Stats */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
@@ -104,7 +172,7 @@ const Transport = () => {
                                 loading="lazy"
                                 allowFullScreen
                                 referrerPolicy="no-referrer-when-downgrade"
-                                src={`https://www.google.com/maps/embed/v1/directions?key=AIzaSyDyaStNd9U3Q0BF4tDi-URy8ez19VpN57U&origin=Ahmedabad,Gujarat&destination=${selectedVehicle?.current_route ? selectedVehicle.current_route.split(' to ')[1] || 'Mumbai,Maharashtra' : 'Mumbai,Maharashtra'}&zoom=6&mode=driving`}
+                                src={`https://www.google.com/maps/embed/v1/directions?key=AIzaSyDyaStNd9U3Q0BF4tDi-URy8ez19VpN57U&origin=${selectedVehicle?.origin || 'Ahmedabad,Gujarat'}&destination=${selectedVehicle?.destination || 'Mumbai,Maharashtra'}&zoom=6&mode=driving`}
                             ></iframe>
 
                             {/* Overlay Fleet Markers (Simulated Visuals) */}
@@ -153,7 +221,7 @@ const Transport = () => {
                                 <div className="grid grid-cols-2 gap-4 text-sm mb-4">
                                     <div className="flex items-center text-gray-600 dark:text-gray-400">
                                         <MapPin className="w-4 h-4 mr-2" />
-                                        {vehicle.current_route || vehicle.depot_name || 'Depot'}
+                                        {vehicle.origin || 'Depot'} → {vehicle.destination || 'Unknown'}
                                     </div>
                                     <div className="flex items-center text-gray-600 dark:text-gray-400">
                                         <Clock className="w-4 h-4 mr-2" />
@@ -180,6 +248,8 @@ const Transport = () => {
                     </div>
                 </div>
             </motion.div>
+            <RouteSimulator isOpen={isSimulatorOpen} onClose={() => setIsSimulatorOpen(false)} />
+
         </div>
     );
 };

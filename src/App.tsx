@@ -14,9 +14,11 @@ import Analytics from './pages/admin/Analytics';
 import LaborManagement from './pages/admin/LaborManagement';
 import EnergyMix from './pages/admin/EnergyMix';
 import Plants from './pages/admin/Plants';
+import AdminMetrics from './pages/AdminMetrics';
 
 // Transport
 import Transport from './pages/Transport';
+import Maintenance from './pages/Maintenance';
 
 // Storage
 import Storage from './pages/Storage';
@@ -53,7 +55,9 @@ function App() {
                                 <Route path="orders" element={<OrderManagement />} />
                                 <Route path="analytics" element={<Analytics />} />
                                 <Route path="labor" element={<LaborManagement />} />
+                                <Route path="labor" element={<LaborManagement />} />
                                 <Route path="energy-mix" element={<EnergyMix />} />
+                                <Route path="metrics" element={<AdminMetrics />} />
                             </Routes>
                         </>
                     } />
@@ -63,6 +67,12 @@ function App() {
                         <>
                             <Navbar />
                             <Transport />
+                        </>
+                    } />
+                    <Route path="/maintenance" element={
+                        <>
+                            <Navbar />
+                            <Maintenance />
                         </>
                     } />
 

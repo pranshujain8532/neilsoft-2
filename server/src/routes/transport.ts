@@ -560,4 +560,24 @@ router.post('/seed', async (req, res) => {
     }
 });
 
+// Calculate ETA endpoint
+router.get('/eta', async (req, res) => {
+    try {
+        const { origin, destination } = req.query;
+        if (!origin || !destination) {
+            return res.status(400).json({ error: 'Origin and destination required' });
+        }
+
+        const result = await getDistanceAndDuration(String(origin), String(destination));
+        res.json({
+            distance: result.distance,
+            duration: result.eta,
+            duration_in_traffic: result.eta // Google Matrix API usually returns duration_in_traffic if requested, but for now mapping eta
+        });
+    } catch (error) {
+        console.error('ETA calculation error:', error);
+        res.status(500).json({ error: 'Failed to calculate ETA' });
+    }
+});
+
 export default router;
