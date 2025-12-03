@@ -10,7 +10,7 @@ const Landing = () => {
             <SplineBackground />
 
             {/* Hero Section */}
-            <section className="section-padding min-h-screen flex items-center justify-center relative">
+            <section className="section-padding min-h-screen flex items-center justify-center relative z-10">
                 <div className="max-w-7xl mx-auto text-center">
                     <motion.div
                         initial={{ opacity: 0, y: 30 }}
@@ -67,7 +67,7 @@ const Landing = () => {
             </section>
 
             {/* Features Section */}
-            <section className="section-padding bg-white/50 dark:bg-gray-800/50">
+            <section className="section-padding relative z-10">
                 <div className="max-w-7xl mx-auto">
                     <motion.h2
                         initial={{ opacity: 0 }}
@@ -104,13 +104,13 @@ const Landing = () => {
             </section>
 
             {/* CTA Section */}
-            <section className="section-padding">
+            <section className="section-padding relative z-10">
                 <div className="max-w-4xl mx-auto text-center">
                     <motion.div
                         initial={{ opacity: 0, scale: 0.9 }}
                         whileInView={{ opacity: 1, scale: 1 }}
                         viewport={{ once: true }}
-                        className="card-glass p-12"
+                        className="p-12"
                     >
                         <h2 className="text-3xl font-bold mb-4">Ready to Go Green?</h2>
                         <p className="text-gray-600 dark:text-gray-300 mb-8">

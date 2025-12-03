@@ -9,10 +9,10 @@ export interface ETAResponse {
 }
 
 export const calculateETA = async (origin: string, destination: string): Promise<ETAResponse> => {
-    if (!GOOGLE_MAPS_API_KEY) {
-        console.warn('Google Maps API key missing, returning mock ETA');
-        return { distance: '120 km', duration: '2h 30m', duration_in_traffic: '2h 45m' };
-    }
+    // if (!GOOGLE_MAPS_API_KEY) {
+    //     console.warn('Google Maps API key missing, returning mock ETA');
+    //     return { distance: '120 km', duration: '2h 30m', duration_in_traffic: '2h 45m' };
+    // }
 
     try {
         // Note: Client-side calls to Google Maps Directions API might be blocked by CORS.

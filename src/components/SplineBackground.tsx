@@ -105,7 +105,7 @@ const SplineBackground = () => {
     return (
         <canvas
             ref={canvasRef}
-            className="fixed inset-0 -z-10"
+            className="fixed inset-0 z-0"
             style={{ background: '#1f0929' }}
         />
     );
