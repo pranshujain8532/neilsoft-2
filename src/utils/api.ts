@@ -177,21 +177,23 @@ export const transportAPI = {
         // Call ML backend to optimize plant and vehicle selection
         const response = await mlApi.post('/logistics/optimize-order', order);
         if (response.data.success) {
-            const { plant, vehicle } = response.data.recommendation;
+            const { plant, vehicle, transport_method, explanation } = response.data.recommendation;
 
-            if (!vehicle) throw new Error('No idle vehicles available');
+            // For pipeline transport, vehicle is not required
+            if (transport_method !== 'pipeline' && !vehicle) {
+                throw new Error('No idle vehicles available for truck transport');
+            }
 
-            // Assign vehicle in Supabase
-            await supabase.from('vehicles').update({
-                current_order: order.id,
-                status: 'in-transit',
-                current_route: `${plant.plant_name} to ${order.delivery_address || 'Customer'}`
-            }).eq('id', vehicle.id);
+            // Only update vehicle if it's truck transport and we have a vehicle
+            if (vehicle && transport_method !== 'pipeline') {
+                await supabase.from('vehicles').update({
+                    current_order: order.id,
+                    status: 'in-transit',
+                    current_route: `${plant.name || plant.plant_name} to ${order.delivery_address || 'Customer'}`
+                }).eq('id', vehicle.id);
+            }
 
-            // Update order with selected plant (if order table has plant_id, otherwise just status)
-            // Assuming we might want to store the plant selection somewhere
-
-            return { data: { vehicle, plant } };
+            return { data: { vehicle, plant, transport_method, explanation } };
         }
         throw new Error(response.data.message || 'Optimization failed');
     },

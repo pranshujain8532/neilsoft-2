@@ -1,14 +1,20 @@
 """
 HYBRID Plant Recommendation System
-Combines Rule-Based Logic (60%) + TensorFlow ML Learning (40%)
-Learns from historical order assignment patterns for better recommendations
+Logic: 
+1. Geocode Order Address
+2. Filter: If Distance > 500km, MUST use Pipeline (else ignore plant)
+3. Score: Availability (15%) + Renewable (5%) + Capacity (35%) + Distance (25%) + Cost (20%)
+4. Explain decision in plain English
 """
 
 import numpy as np
 import os
+import googlemaps
 from typing import Dict, List, Optional, Tuple
+from supabase import create_client, Client
+from dotenv import load_dotenv
 
-# Try to import TensorFlow
+# Try to import TensorFlow (Optional)
 try:
     import tensorflow as tf
     from tensorflow import keras
@@ -18,418 +24,316 @@ except ImportError:
     HAS_TF = False
     print("⚠️ TensorFlow not available, using rule-based only")
 
-
 class HybridPlantRecommender:
-    def __init__(self, model_path='models/saved/plant_recommender_nn.h5'):
-        self.model_path = model_path
-        self.ml_model = None
-        self.scaler_params = {}
+    def __init__(self, supabase_url, supabase_key, google_maps_key, model_path='models/saved/plant_recommender_nn.h5'):
+        self.supabase: Client = create_client(supabase_url, supabase_key)
+        self.gmaps = googlemaps.Client(key=google_maps_key) if google_maps_key else None
         
-        # Hybrid weights: 60% rule-based, 40% ML
-        self.hybrid_weights = {
-            'rule_based': 0.6,
-            'ml_based': 0.4
-        }
-        
-        # Rule-based scoring weights
+        # Scoring Weights (Total 1.0)
         self.rule_weights = {
             'capacity_match': 0.35,
             'distance': 0.25,
             'lcoh': 0.20,
-            'renewable_score': 0.15,
-            'availability': 0.05
+            'availability': 0.15,  # Priority as requested
+            'renewable_score': 0.05 # Reduced as requested
         }
+
+    # --- GEOLOCATION HELPER ---
+    def get_coordinates(self, address: str) -> Tuple[float, float]:
+        """Convert address to Lat/Lon using Google Maps API"""
+        if not self.gmaps:
+            # Fallback for testing if no API Key
+            print("⚠️ No Google Maps Key. Returning Default (Nagpur, India Center)")
+            return 21.1458, 79.0882 
         
-        # Try to load existing ML model
-        if HAS_TF and os.path.exists(model_path):
-            self.load_ml_model()
-        elif HAS_TF:
-            self.build_ml_model()
-    
-    def build_ml_model(self):
-        """Build TensorFlow neural network for pattern learning"""
-        if not HAS_TF:
-            return
-        
-        # Neural network to learn plant-order matching patterns
-        # Input: [order_quantity, order_priority, plant_capacity, plant_lcoh, distance, renewable%]
-        model = keras.Sequential([
-            layers.Dense(64, activation='relu', input_shape=(6,)),
-            layers.Dropout(0.2),
-            layers.Dense(32, activation='relu'),
-            layers.Dropout(0.2),
-            layers.Dense(16, activation='relu'),
-            layers.Dense(1, activation='sigmoid')  # Probability that this plant is good match
-        ])
-        
-        model.compile(
-            optimizer=keras.optimizers.Adam(learning_rate=0.001),
-            loss='binary_crossentropy',
-            metrics=['accuracy']
-        )
-        
-        self.ml_model = model
-        print("✅ Hybrid Plant Recommender: TensorFlow ML model built")
-    
-    def fetch_historical_orders(self) -> Optional[List[Dict]]:
-        """Fetch historical order assignments from Supabase"""
         try:
-            from supabase import create_client
-            from dotenv import load_dotenv
-            
-            # Load .env from project root
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            project_root = os.path.dirname(os.path.dirname(current_dir))
-            env_path = os.path.join(project_root, '.env')
-            load_dotenv(env_path)
-            
-            url = os.environ.get('VITE_SUPABASE_URL')
-            key = os.environ.get('VITE_SUPABASE_ANON_KEY')
-            
-            if not url or not key:
-                print("⚠️ Cannot fetch historical data: Supabase credentials missing")
-                return None
-            
-            supabase = create_client(url, key)
-            
-            # Fetch orders with assigned plants (where we have outcomes)
-            response = supabase.table('orders')\
-                .select('*')\
-                .not_.is_('assigned_plant_id', 'null')\
-                .limit(1000)\
-                .execute()
-            
-            if response.data and len(response.data) > 0:
-                print(f"✅ Fetched {len(response.data)} historical orders for ML training")
-                return response.data
-            else:
-                print("ℹ️  No historical orders found for ML training")
-                return None
-            
+            geocode_result = self.gmaps.geocode(address)
+            if geocode_result:
+                loc = geocode_result[0]['geometry']['location']
+                return loc['lat'], loc['lng']
         except Exception as e:
-            print(f"⚠️ Error fetching historical data: {e}")
-            return None
-    
-    def train_ml_model(self, historical_orders: Optional[List[Dict]] = None, epochs=50):
-        """Train ML model on historical order-plant assignments"""
-        if not HAS_TF or not self.ml_model:
-            print("⚠️ TensorFlow not available, skipping ML training")
-            return
+            print(f"⚠️ Geocoding error: {e}")
         
-        if historical_orders is None:
-            historical_orders = self.fetch_historical_orders()
-        
-        if not historical_orders or len(historical_orders) < 10:
-            print("⚠️ Insufficient historical data for ML training (need 10+ orders)")
-            return
-        
-        # TODO: Process historical orders into training data
-        # For now, generate synthetic training data as placeholder
-        print("🔄 Generating synthetic training data (placeholder for historical)...")
-        X_train, y_train = self._generate_synthetic_training_data(samples=5000)
-        
-        print(f"📊 Training ML model on {len(X_train)} samples...")
-        history = self.ml_model.fit(
-            X_train, y_train,
-            epochs=epochs,
-            batch_size=32,
-            validation_split=0.2,
-            verbose=0
-        )
-        
-        accuracy = history.history['val_accuracy'][-1]
-        print(f"✅ ML model trained! Validation accuracy: {accuracy*100:.1f}%")
-        
-        self.save_ml_model()
-    
-    def _generate_synthetic_training_data(self, samples=5000) -> Tuple[np.ndarray, np.ndarray]:
-        """Generate synthetic training data for ML model"""
-        np.random.seed(42)
-        
-        X_data = []
-        y_data = []
-        
-        for _ in range(samples):
-            # Features: order_quantity, order_priority, plant_capacity, plant_lcoh, distance, renewable%
-            order_qty = np.random.uniform(100, 5000)  # kg
-            order_priority = np.random.uniform(0, 1)  # 0=low, 1=high
-            plant_capacity = np.random.uniform(500, 3000)  # kg/day
-            plant_lcoh = np.random.uniform(1.5, 3.0)  # $/kg
-            distance = np.random.uniform(0, 1000)  # km
-            renewable_pct = np.random.uniform(0, 100)  # %
-            
-            # Label: 1 if good match, 0 if bad match (simulated logic)
-            capacity_match = 1.0 if 0.3 <= (order_qty / plant_capacity) <= 0.7 else 0.0
-            cost_ok = 1.0 if plant_lcoh < 2.5 else 0.0
-            distance_ok = 1.0 if distance < 500 else 0.0
-            
-            # Good match if at least 2 out of 3 criteria met
-            good_match = 1.0 if (capacity_match + cost_ok + distance_ok) >= 2.0 else 0.0
-            
-            X_data.append([order_qty, order_priority, plant_capacity, plant_lcoh, distance, renewable_pct])
-            y_data.append(good_match)
-        
-        X = np.array(X_data)
-        y = np.array(y_data)
-        
-        # Normalize features
-        self.scaler_params['X_mean'] = X.mean(axis=0)
-        self.scaler_params['X_std'] = X.std(axis=0) + 1e-7
-        
-        X_normalized = (X - self.scaler_params['X_mean']) / self.scaler_params['X_std']
-        
-        return X_normalized, y
-    
-    def calculate_distance(self, plant_coords: Dict, customer_coords: Dict) -> float:
-        """Calculate haversine distance between coordinates"""
+        return 21.1458, 79.0882
+
+    def calculate_distance(self, lat1, lon1, lat2, lon2) -> float:
+        """Haversine distance in km"""
         from math import radians, sin, cos, sqrt, atan2
-        
-        lat1, lon1 = radians(plant_coords.get('lat', 0)), radians(plant_coords.get('lng', 0))
-        lat2, lon2 = radians(customer_coords.get('lat', 0)), radians(customer_coords.get('lng', 0))
-        
-        dlat = lat2 - lat1
-        dlon = lon2 - lon1
-        
-        a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+        R = 6371 # Earth radius km
+        dlat, dlon = radians(lat2 - lat1), radians(lon2 - lon1)
+        a = sin(dlat/2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon/2)**2
         c = 2 * atan2(sqrt(a), sqrt(1-a))
+        return R * c
+
+    # --- SCORING ENGINE ---
+    def score_plant(self, plant: Dict, order_details: Dict) -> Tuple[float, Dict]:
+        # 1. Parse Plant Data
+        p_cap = float(plant.get('capacity_mw', 50)) * 1000 # Convert MW to kg/day approx
+        p_lcoh = float(plant.get('lcoh', 2.5))
+        p_avail = 1.0 if plant.get('status') == 'operational' else 0.0
+        p_renew = float(plant.get('renewable_percentage', 0)) / 100
         
-        return 6371 * c  # km
-    
-    def score_plant_rule_based(self, plant: Dict, order: Dict) -> float:
-        """Calculate rule-based score (original logic)"""
-        
-        # Capacity match score
-        order_quantity = order.get('quantity', 1000)  # kg
-        plant_capacity = plant.get('capacity', 50) * 1000  # Convert TPD to kg/day
-        capacity_ratio = min(order_quantity / plant_capacity, 1.0)
-        capacity_score = 1.0 - abs(capacity_ratio - 0.5)  # Peak at 50% utilization
-        
-        # Distance score
-        if plant.get('location', {}).get('coordinates') and order.get('delivery_location', {}).get('coordinates'):
-            distance = self.calculate_distance(
-                plant['location']['coordinates'],
-                order['delivery_location']['coordinates']
-            )
-            distance_score = max(0, 1.0 - distance / 1000)  # Normalize to 1000km
-        else:
-            distance = 500  # Default
-            distance_score = 0.5
-        
-        # LCOH score (lower is better)
-        lcoh = plant.get('lcoh', 2.0)
-        lcoh_score = max(0, 1.0 - (lcoh - 1.0) / 2.0)  # Normalize $1-3/kg range
-        
-        # Renewable energy score
-        energy_mix = plant.get('energySources', {})
-        solar = energy_mix.get('solar', {}).get('current', 0)
-        wind = energy_mix.get('wind', {}).get('current', 0)
-        hydro = energy_mix.get('hydro', {}).get('current', 0)
-        total_renewable = solar + wind + hydro
-        total_capacity = plant.get('totalEnergyCapacity', 100)
-        renewable_score = (total_renewable / total_capacity) if total_capacity > 0 else 0
-        
-        # Availability score
-        status = plant.get('status', 'active')
-        availability_score = 1.0 if status == 'active' else 0.3
-        
-        # Calculate weighted rule-based score
-        rule_score = (
-            self.rule_weights['capacity_match'] * capacity_score +
-            self.rule_weights['distance'] * distance_score +
-            self.rule_weights['lcoh'] * lcoh_score +
-            self.rule_weights['renewable_score'] * renewable_score +
-            self.rule_weights['availability'] * availability_score
+        o_qty = float(order_details.get('quantity', 1000))
+        dist = order_details.get('distance_km', 500)
+
+        # 2. Normalize Metrics (0.0 to 1.0)
+        # Capacity: Bell curve peaking at 50% utilization
+        cap_ratio = min(o_qty / (p_cap + 1), 1.0)
+        s_cap = 1.0 - abs(cap_ratio - 0.5)
+
+        # Distance: Closer is better (0 score at 2000km)
+        s_dist = max(0, 1.0 - (dist / 2000))
+
+        # LCOH: Cheaper is better ($1 = 1.0 score, $5 = 0.0 score)
+        s_lcoh = max(0, 1.0 - (p_lcoh - 1.0) / 4.0)
+
+        # 3. Calculate Final Score
+        w = self.rule_weights
+        final_score = (
+            w['capacity_match'] * s_cap +
+            w['distance'] * s_dist +
+            w['lcoh'] * s_lcoh +
+            w['availability'] * p_avail +
+            w['renewable_score'] * p_renew
         )
         
-        return rule_score
-    
-    def score_plant_ml(self, plant: Dict, order: Dict) -> float:
-        """Calculate ML-based score using trained neural network"""
-        if not HAS_TF or not self.ml_model:
-            return 0.5  # Neutral score if ML not available
-        
-        # Extract features
-        order_qty = order.get('quantity', 1000)
-        order_priority = order.get('priority', 0.5)  # Between 0 and 1
-        plant_capacity = plant.get('capacity', 50) * 1000  # kg/day
-        plant_lcoh = plant.get('lcoh', 2.0)
-        
-        # Calculate distance
-        if plant.get('location', {}).get('coordinates') and order.get('delivery_location', {}).get('coordinates'):
-            distance = self.calculate_distance(
-                plant['location']['coordinates'],
-                order['delivery_location']['coordinates']
-            )
-        else:
-            distance = 500
-        
-        # Calculate renewable %
-        energy_mix = plant.get('energySources', {})
-        solar = energy_mix.get('solar', {}).get('current', 0)
-        wind = energy_mix.get('wind', {}).get('current', 0)
-        hydro = energy_mix.get('hydro', {}).get('current', 0)
-        total_renewable = solar + wind + hydro
-        total_capacity = plant.get('totalEnergyCapacity', 100)
-        renewable_pct = (total_renewable / total_capacity * 100) if total_capacity > 0 else 0
-        
-        # Prepare input features
-        features = np.array([[order_qty, order_priority, plant_capacity, plant_lcoh, distance, renewable_pct]])
-        
-        # Normalize using saved scaler params
-        if self.scaler_params:
-            features = (features - self.scaler_params.get('X_mean', 0)) / self.scaler_params.get('X_std', 1)
-        
-        # Predict
-        ml_score = self.ml_model.predict(features, verbose=0)[0][0]
-        
-        return float(ml_score)
-    
-    def score_plant_hybrid(self, plant: Dict, order: Dict) -> Dict:
-        """Score a plant using HYBRID approach: 60% rule-based + 40% ML"""
-        
-        # Get both scores
-        rule_score = self.score_plant_rule_based(plant, order)
-        ml_score = self.score_plant_ml(plant, order)
-        
-        # Combine with 60-40 weighting
-        hybrid_score = (
-            self.hybrid_weights['rule_based'] * rule_score +
-            self.hybrid_weights['ml_based'] * ml_score
-        )
-        
-        return {
-            'plant_id': plant.get('id', plant.get('_id', 'unknown')),
-            'plant_name': plant.get('name', 'Unknown'),
-            'hybrid_score': hybrid_score,
-            'rule_based_score': rule_score,
-            'ml_score': ml_score if HAS_TF else None,
-            'score_breakdown': {
-                'rule_based_weight': self.hybrid_weights['rule_based'],
-                'ml_weight': self.hybrid_weights['ml_based'],
-                'final': hybrid_score
-            }
+        contributions = {
+            'Capacity': round(w['capacity_match'] * s_cap, 2),
+            'Distance': round(w['distance'] * s_dist, 2),
+            'Low Cost': round(w['lcoh'] * s_lcoh, 2),
+            'Availability': round(w['availability'] * p_avail, 2),
+            'Renewable': round(w['renewable_score'] * p_renew, 2)
         }
-    
-    def recommend_plants(self, plants: List[Dict], order: Dict, top_n: int = 3) -> List[Dict]:
-        """Recommend top N plants using HYBRID scoring"""
-        
-        scored_plants = []
-        for plant in plants:
-            score_data = self.score_plant_hybrid(plant, order)
-            scored_plants.append(score_data)
-        
-        # Sort by hybrid score (descending)
-        scored_plants.sort(key=lambda x: x['hybrid_score'], reverse=True)
-        
-        return scored_plants[:top_n]
-    
-    def save_ml_model(self):
-        """Save trained ML model"""
-        if not HAS_TF or not self.ml_model:
-            return
-        
-        os.makedirs(os.path.dirname(self.model_path), exist_ok=True)
-        self.ml_model.save(self.model_path)
-        
-        # Save scaler params
-        import json
-        params_path = self.model_path.replace('.h5', '_scaler.json')
-        with open(params_path, 'w') as f:
-            json.dump({k: v.tolist() if isinstance(v, np.ndarray) else v 
-                      for k, v in self.scaler_params.items()}, f)
-        
-        print(f"💾 ML model saved to {self.model_path}")
-    
-    def load_ml_model(self):
-        """Load pre-trained ML model"""
-        if not HAS_TF:
-            return
-        
-        try:
-            self.ml_model = keras.models.load_model(self.model_path)
-            
-            import json
-            params_path = self.model_path.replace('.h5', '_scaler.json')
-            if os.path.exists(params_path):
-                with open(params_path, 'r') as f:
-                    params = json.load(f)
-                    self.scaler_params = {k: np.array(v) if isinstance(v, list) else v 
-                                        for k, v in params.items()}
-            
-            print(f"✅ ML model loaded from {self.model_path}")
-        except Exception as e:
-            print(f"⚠️  Could not load ML model: {e}")
-            print(f"✅ ML model loaded from {self.model_path}")
-        except Exception as e:
-            print(f"⚠️  Could not load ML model: {e}")
-            self.build_ml_model()
+        return final_score, contributions
 
-    def explain_prediction(self, plant: Dict, order: Dict) -> Dict:
-        """Explain prediction using SHAP values"""
-        if not HAS_TF or not self.ml_model:
-            return {"error": "ML model not available"}
+    # --- MAIN PROCESS ---
+    def process_pending_orders(self):
+        print("\n🔄 RECOMMENDATION ENGINE STARTING...")
         
-        try:
-            import shap
+        # 1. Fetch Data
+        orders = self.supabase.table('orders').select('*').eq('status', 'pending').execute().data
+        plants = self.supabase.table('plants').select('*').execute().data
+        
+        if not orders:
+            print("   ✅ No pending orders.")
+            return
+
+        for order in orders:
+            print(f"\n📦 Processing Order #{order['id'][:8]} (Qty: {order['quantity']}kg)")
             
-            # Prepare input features (single sample)
-            order_qty = order.get('quantity', 1000)
-            order_priority = order.get('priority', 0.5)
-            plant_capacity = plant.get('capacity', 50) * 1000
-            plant_lcoh = plant.get('lcoh', 2.0)
-            
-            if plant.get('location', {}).get('coordinates') and order.get('delivery_location', {}).get('coordinates'):
-                distance = self.calculate_distance(
-                    plant['location']['coordinates'],
-                    order['delivery_location']['coordinates']
-                )
+            # 2. Get Customer Location
+            if order.get('delivery_latitude') and order.get('delivery_longitude'):
+                o_lat, o_lon = order['delivery_latitude'], order['delivery_longitude']
             else:
-                distance = 500
-            
-            energy_mix = plant.get('energySources', {})
-            total_renewable = (energy_mix.get('solar', {}).get('current', 0) + 
-                             energy_mix.get('wind', {}).get('current', 0) + 
-                             energy_mix.get('hydro', {}).get('current', 0))
-            total_capacity = plant.get('totalEnergyCapacity', 100)
-            renewable_pct = (total_renewable / total_capacity * 100) if total_capacity > 0 else 0
-            
-            features = np.array([[order_qty, order_priority, plant_capacity, plant_lcoh, distance, renewable_pct]])
-            
-            # Normalize
-            if self.scaler_params:
-                features = (features - self.scaler_params.get('X_mean', 0)) / self.scaler_params.get('X_std', 1)
-            
-            # Use KernelExplainer with a small background dataset (e.g. zeros or mean)
-            # For speed, we use a small background summary
-            background = np.zeros((10, 6)) # Placeholder background
-            explainer = shap.KernelExplainer(self.ml_model.predict, background)
-            shap_values = explainer.shap_values(features, nsamples=100)
-            
-            feature_names = ['Order Qty', 'Priority', 'Capacity', 'LCOH', 'Distance', 'Renewable %']
-            
-            # Format explanation
-            explanation = []
-            # shap_values is a list for multi-output, or array for single output
-            vals = shap_values[0][0] if isinstance(shap_values, list) else shap_values[0]
-            
-            for i, name in enumerate(feature_names):
-                explanation.append({
-                    "feature": name,
-                    "importance": float(vals[i]),
-                    "value": float(features[0][i])
-                })
-            
-            # Sort by absolute importance
-            explanation.sort(key=lambda x: abs(x['importance']), reverse=True)
-            
-            return {"features": explanation}
-            
-        except ImportError:
-            return {"error": "SHAP library not installed"}
-        except Exception as e:
-            print(f"SHAP explanation error: {e}")
-            return {"error": str(e)}
+                addr = order.get('delivery_address', 'India')
+                print(f"   📍 Geocoding address: {addr}")
+                o_lat, o_lon = self.get_coordinates(addr)
+                # Save coords to DB so we don't pay for API again
+                self.supabase.table('orders').update({'delivery_latitude': o_lat, 'delivery_longitude': o_lon}).eq('id', order['id']).execute()
 
+            # 3. Filter Candidates (The Pipeline Rule)
+            valid_plants = []
+            
+            for plant in plants:
+                p_lat = float(plant.get('latitude') or 0)
+                p_lon = float(plant.get('longitude') or 0)
+                dist_km = self.calculate_distance(p_lat, p_lon, o_lat, o_lon)
+                
+                has_pipeline = plant.get('pipeline_available', False)
+                if isinstance(plant.get('pipeline_available'), str):
+                     if plant.get('pipeline_available').lower() == 'true':
+                         has_pipeline = True
+                
+                # --- STRICT LOGIC ---
+                # "If distance > 500km, see ONLY plants with pipeline"
+                is_viable = True
+                if dist_km > 500 and not has_pipeline:
+                    is_viable = False
+                    print(f"   ❌ Skipping {plant['name']} (Dist: {int(dist_km)}km, No Pipeline)")
+                
+                if is_viable:
+                    plant['calc_distance'] = dist_km
+                    valid_plants.append(plant)
 
-# Create global instance
-plant_recommender = HybridPlantRecommender()
+            # Fallback: If ALL plants were skipped, bring them back (don't fail the order)
+            if not valid_plants:
+                print("   ⚠️ No plants met strict criteria. Falling back to all plants.")
+                for p in plants:
+                    p['calc_distance'] = self.calculate_distance(float(p['latitude']), float(p['longitude']), o_lat, o_lon)
+                    valid_plants.append(p)
+
+            # 4. Score Valid Candidates
+            best_plant = None
+            best_score = -1
+            best_explanation = ""
+            transport_method = "truck"
+            best_contribs = {}
+
+            for plant in valid_plants:
+                score, contribs = self.score_plant(plant, {'quantity': order['quantity'], 'distance_km': plant['calc_distance']})
+                
+                # Boost score if priority user
+                if order.get('priority_score', 0) > 0:
+                    score += 0.1 # Flat boost
+                
+                if score > best_score:
+                    best_score = score
+                    best_plant = plant
+                    best_contribs = contribs
+                    
+                    # Determine Transport Method
+                    is_pipe = plant.get('pipeline_available', False)
+                    if plant['calc_distance'] > 500 and is_pipe:
+                        transport_method = "pipeline"
+                    else:
+                        transport_method = "truck"
+
+            # 5. Generate Explanation & Save
+            if best_plant:
+                # Sort factors by impact
+                factors = sorted(best_contribs.items(), key=lambda x: x[1], reverse=True)
+                top_1 = factors[0]
+                top_2 = factors[1]
+                
+                explanation = f"I picked {best_plant['name']} because {top_1[0]} (+{top_1[1]}) and {top_2[0]} (+{top_2[1]}) were strong factors."
+                
+                if transport_method == 'pipeline':
+                    explanation += " Chosen via Pipeline availability (Long Distance)."
+                elif best_plant.get('lcoh', 0) > 2.0:
+                    explanation += f" High Cost (-{best_contribs['Low Cost']}) was outweighed by Availability."
+
+                # Update Supabase
+                update_payload = {
+                    'assigned_plant_id': best_plant['id'],
+                    'status': 'assigned',
+                    'transport_method': transport_method,
+                    'ai_explanation': explanation
+                }
+                self.supabase.table('orders').update(update_payload).eq('id', order['id']).execute()
+                self.supabase.table('orders').update(update_payload).eq('id', order['id']).execute()
+                print(f"   ✅ ASSIGNED: {best_plant['name']} via {transport_method.upper()}")
+                print(f"   📝 {explanation}")
+
+    # --- SINGLE ORDER API ---
+    def recommend_for_order(self, order: Dict) -> Dict:
+        """
+        Recommend a plant for a single order object.
+        
+        Logic:
+        1. Calculate distance from each plant to customer
+        2. If ALL plants > 500km OR ALL plants < 500km -> use recommendation on ALL plants
+        3. If MIXED (some < 500km, some > 500km) -> filter to plants < 500km, then recommend
+        
+        Returns: { 'plant': ..., 'transport_method': 'truck'|'pipeline', 'explanation': ... }
+        """
+        print(f"\n🧠 AI Recommender: Analyzing Order #{order.get('id', 'NEW')[:8] if order.get('id') else 'NEW'}")
+
+        # 1. Fetch Plants
+        plants = self.supabase.table('plants').select('*').eq('status', 'operational').execute().data
+        if not plants:
+            print("   ❌ No operational plants found")
+            return None
+
+        # 2. Geocode customer location
+        if order.get('delivery_latitude') and order.get('delivery_longitude'):
+            o_lat, o_lon = order['delivery_latitude'], order['delivery_longitude']
+        else:
+            addr = order.get('delivery_address', 'India')
+            print(f"   📍 Geocoding: {addr[:50]}...")
+            o_lat, o_lon = self.get_coordinates(addr)
+        
+        # 3. Calculate distance for ALL plants
+        plants_with_distance = []
+        for plant in plants:
+            p_lat = float(plant.get('latitude') or 0)
+            p_lon = float(plant.get('longitude') or 0)
+            dist_km = self.calculate_distance(p_lat, p_lon, o_lat, o_lon)
+            plant['calc_distance'] = dist_km
+            plants_with_distance.append(plant)
+            print(f"   📏 {plant['name']}: {int(dist_km)}km")
+        
+        # 4. Categorize plants by distance
+        plants_under_500 = [p for p in plants_with_distance if p['calc_distance'] <= 500]
+        plants_over_500 = [p for p in plants_with_distance if p['calc_distance'] > 500]
+        
+        print(f"\n   📊 Distance Analysis:")
+        print(f"      Plants ≤500km: {len(plants_under_500)}")
+        print(f"      Plants >500km: {len(plants_over_500)}")
+        
+        # 5. Determine which plants to consider for recommendation
+        if len(plants_under_500) == 0:
+            # ALL plants are > 500km -> Use all plants, likely need pipeline
+            candidates = plants_with_distance
+            print(f"   ⚡ All plants far (>500km). Considering all for recommendation.")
+        elif len(plants_over_500) == 0:
+            # ALL plants are <= 500km -> Use all plants, trucks will work
+            candidates = plants_with_distance
+            print(f"   ✅ All plants close (≤500km). Considering all for recommendation.")
+        else:
+            # MIXED -> Filter to only plants under 500km (prefer truck routes)
+            candidates = plants_under_500
+            print(f"   🔍 Mixed distances. Filtering to {len(plants_under_500)} close plants.")
+
+        # 6. Score candidates using recommendation system
+        best_plant = None
+        best_score = -1
+        best_contribs = {}
+
+        for plant in candidates:
+            score, contribs = self.score_plant(plant, {'quantity': order.get('quantity', 1000), 'distance_km': plant['calc_distance']})
+            
+            if order.get('priority_score', 0) > 0:
+                score += 0.1
+            
+            if score > best_score:
+                best_score = score
+                best_plant = plant
+                best_contribs = contribs
+
+        if not best_plant:
+            print("   ❌ No plant could be selected")
+            return None
+
+        # 7. Determine transport method based on selected plant's distance
+        transport_method = "truck"
+        has_pipeline = False
+        if isinstance(best_plant.get('pipeline_available'), bool):
+            has_pipeline = best_plant.get('pipeline_available')
+        elif isinstance(best_plant.get('pipeline_available'), str):
+            if best_plant.get('pipeline_available').lower() == 'true':
+                has_pipeline = True
+
+        # Only use pipeline if distance > 500km AND plant has pipeline capability
+        if best_plant['calc_distance'] > 500 and has_pipeline:
+            transport_method = "pipeline"
+            print(f"   🧪 Selected plant is {int(best_plant['calc_distance'])}km away with pipeline -> Pipeline Transport")
+        else:
+            print(f"   🚛 Selected plant is {int(best_plant['calc_distance'])}km away -> Truck Transport")
+
+        # 8. Generate Explanation
+        factors = sorted(best_contribs.items(), key=lambda x: x[1], reverse=True)
+        explanation = f"Selected {best_plant['name']} based on {factors[0][0]} and {factors[1][0]}."
+        
+        if transport_method == 'pipeline':
+            explanation += " Using Pipeline for long-distance delivery."
+        elif best_plant.get('lcoh', 0) > 2.0:
+            explanation += " Prioritized availability over cost."
+
+        print(f"   ✅ SELECTED: {best_plant['name']} (Score: {best_score:.3f}) via {transport_method.upper()}")
+
+        return {
+            'plant': best_plant,
+            'transport_method': transport_method,
+            'explanation': explanation,
+            'score': best_score,
+            'details': best_contribs
+        }
+
+if __name__ == "__main__":
+    # Load keys
+    URL = os.getenv('SUPABASE_URL')
+    KEY = os.getenv('SUPABASE_SERVICE_ROLE_KEY') or os.getenv('SUPABASE_KEY')
+    GMAP = os.getenv('GOOGLE_MAPS_API_KEY')
+    
+    engine = HybridPlantRecommender(URL, KEY, GMAP)
+    engine.process_pending_orders()

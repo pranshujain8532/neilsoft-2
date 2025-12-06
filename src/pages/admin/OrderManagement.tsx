@@ -81,13 +81,34 @@ const OrderManagement = () => {
             // Update order status to in-transit
             await orderAPI.updateStatus(order.id, 'in-transit');
 
-            alert(`Smart Dispatch Successful!\n\nOptimized Plant: ${res.data.plant.plant_name}\nAssigned Vehicle: ${res.data.vehicle.registration}\nDriver: ${res.data.vehicle.driver_name || res.data.vehicle.driver}`);
+            const plantName = res.data.plant.name || res.data.plant.plant_name;
+            const transportMethod = res.data.transport_method || 'truck';
+
+            let message = '';
+
+            if (transportMethod === 'pipeline') {
+                message = `🧪 PIPELINE TRANSPORT SELECTED!\n\n`;
+                message += `📍 Source Plant: ${plantName}\n`;
+                message += `🔗 Transport: Continuous Pipeline Flow\n`;
+                message += `⏱️ Delivery: Real-time continuous supply\n\n`;
+                message += `No vehicle assignment needed - hydrogen flows directly through pipeline infrastructure.`;
+            } else {
+                message = `🚛 TRUCK TRANSPORT SELECTED!\n\n`;
+                message += `📍 Source Plant: ${plantName}\n`;
+                message += `🔗 Transport: Road Delivery\n`;
+                if (res.data.vehicle) {
+                    message += `🚚 Vehicle: ${res.data.vehicle.registration}\n`;
+                    message += `👤 Driver: ${res.data.vehicle.driver}`;
+                }
+            }
+
+            alert(message);
 
             // Updates handled by realtime
             setSelectedOrder({ ...order, status: 'in-transit' });
         } catch (error: any) {
             console.error('Smart dispatch failed', error);
-            alert(`Failed to dispatch order: ${error.message || 'No idle vehicles available'}`);
+            alert(`Failed to dispatch order: ${error.message || 'Optimization failed'}`);
         } finally {
             setLoading(false);
         }
@@ -265,13 +286,48 @@ const OrderManagement = () => {
                                                 <div>
                                                     <p className="font-medium">Est. Delivery</p>
                                                     <p className="text-gray-500">
-                                                        {selectedOrder.delivery_date ? new Date(selectedOrder.delivery_date).toLocaleDateString() : 'Pending'}
+                                                        {selectedOrder.transport_method === 'pipeline'
+                                                            ? <span className="text-blue-500 font-medium">Continuous Flow via Pipeline</span>
+                                                            : (selectedOrder.delivery_date ? new Date(selectedOrder.delivery_date).toLocaleDateString() : 'Pending')
+                                                        }
                                                     </p>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
+
+                                {/* AI Recommendation & Analysis */}
+                                {selectedOrder.ai_explanation && (
+                                    <div className="mt-8 p-4 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                                        <h3 className="font-bold text-blue-500 mb-2 flex items-center">
+                                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                                            AI Recommendation Engine
+                                        </h3>
+                                        <div className="space-y-3 text-sm">
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <span className="text-gray-500 block">Transport Method</span>
+                                                    <span className="font-bold uppercase text-blue-400 flex items-center">
+                                                        {selectedOrder.transport_method === 'pipeline' ? '🧪 Pipeline' : '🚛 Truck'}
+                                                    </span>
+                                                </div>
+                                                <div>
+                                                    <span className="text-gray-500 block">Priority Status</span>
+                                                    <span className={`font-bold ${selectedOrder.priority_score > 0 ? 'text-purple-500' : 'text-gray-400'}`}>
+                                                        {selectedOrder.priority_score > 0 ? '⚡ Priority Layer 1' : 'Standard'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <span className="text-gray-500 block">Analysis</span>
+                                                <p className="italic text-gray-600 dark:text-gray-300 mt-1">
+                                                    "{selectedOrder.ai_explanation}"
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
 
                                 {/* Blockchain Certificate */}
                                 <div className="mt-8 p-4 bg-green-500/10 rounded-lg border border-green-500/20">

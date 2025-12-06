@@ -1,6 +1,9 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useTheme } from './hooks/useTheme';
 
+// Components
+import ProtectedRoute from './components/ProtectedRoute';
+
 // Pages
 import Landing from './pages/Landing';
 import Login from './pages/Login';
@@ -39,78 +42,93 @@ function App() {
         <Router>
             <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 transition-colors duration-300">
                 <Routes>
-                    {/* Public Routes */}
+                    {/* Public Routes - No Login Required */}
                     <Route path="/" element={<Landing />} />
                     <Route path="/login" element={<Login />} />
                     <Route path="/signup" element={<Signup />} />
 
-                    {/* Admin Routes */}
+                    {/* Admin Routes - Login Required + Admin Role */}
                     <Route path="/admin/*" element={
-                        <>
-                            <Navbar />
-                            <Routes>
-                                <Route path="dashboard" element={<AdminDashboard />} />
-                                <Route path="plant-monitoring" element={<PlantMonitoring />} />
-                                <Route path="plants" element={<Plants />} />
-                                <Route path="orders" element={<OrderManagement />} />
-                                <Route path="analytics" element={<Analytics />} />
-                                <Route path="labor" element={<LaborManagement />} />
-                                <Route path="labor" element={<LaborManagement />} />
-                                <Route path="energy-mix" element={<EnergyMix />} />
-                                <Route path="metrics" element={<AdminMetrics />} />
-                            </Routes>
-                        </>
+                        <ProtectedRoute requireAdmin>
+                            <>
+                                <Navbar />
+                                <Routes>
+                                    <Route path="dashboard" element={<AdminDashboard />} />
+                                    <Route path="plant-monitoring" element={<PlantMonitoring />} />
+                                    <Route path="plants" element={<Plants />} />
+                                    <Route path="orders" element={<OrderManagement />} />
+                                    <Route path="analytics" element={<Analytics />} />
+                                    <Route path="labor" element={<LaborManagement />} />
+                                    <Route path="energy-mix" element={<EnergyMix />} />
+                                    <Route path="metrics" element={<AdminMetrics />} />
+                                </Routes>
+                            </>
+                        </ProtectedRoute>
                     } />
 
-                    {/* Transport Routes */}
+                    {/* Transport Routes - Login Required */}
                     <Route path="/transport" element={
-                        <>
-                            <Navbar />
-                            <Transport />
-                        </>
+                        <ProtectedRoute>
+                            <>
+                                <Navbar />
+                                <Transport />
+                            </>
+                        </ProtectedRoute>
                     } />
                     <Route path="/maintenance" element={
-                        <>
-                            <Navbar />
-                            <Maintenance />
-                        </>
+                        <ProtectedRoute>
+                            <>
+                                <Navbar />
+                                <Maintenance />
+                            </>
+                        </ProtectedRoute>
                     } />
 
-                    {/* Storage Routes */}
+                    {/* Storage Routes - Login Required */}
                     <Route path="/storage" element={
-                        <>
-                            <Navbar />
-                            <Storage />
-                        </>
+                        <ProtectedRoute>
+                            <>
+                                <Navbar />
+                                <Storage />
+                            </>
+                        </ProtectedRoute>
                     } />
 
-                    {/* Customer Routes */}
+                    {/* Customer Routes - Login Required */}
                     <Route path="/shop" element={
-                        <>
-                            <Navbar />
-                            <Shop />
-                        </>
+                        <ProtectedRoute>
+                            <>
+                                <Navbar />
+                                <Shop />
+                            </>
+                        </ProtectedRoute>
                     } />
                     <Route path="/cart" element={
-                        <>
-                            <Navbar />
-                            <Cart />
-                        </>
+                        <ProtectedRoute>
+                            <>
+                                <Navbar />
+                                <Cart />
+                            </>
+                        </ProtectedRoute>
                     } />
                     <Route path="/order/:id" element={
-                        <>
-                            <Navbar />
-                            <OrderDetails />
-                        </>
+                        <ProtectedRoute>
+                            <>
+                                <Navbar />
+                                <OrderDetails />
+                            </>
+                        </ProtectedRoute>
                     } />
                     <Route path="/orders" element={
-                        <>
-                            <Navbar />
-                            <OrderHistory />
-                        </>
+                        <ProtectedRoute>
+                            <>
+                                <Navbar />
+                                <OrderHistory />
+                            </>
+                        </ProtectedRoute>
                     } />
 
-                    {/* Catch all */}
+                    {/* Catch all - Redirect to Landing */}
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
             </div>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Trash2, ShoppingBag, ArrowRight, CheckCircle, MapPin, ShieldAlert, Building } from 'lucide-react';
+import { Trash2, ShoppingBag, ArrowRight, CheckCircle, MapPin, ShieldAlert } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { orderAPI } from '@/utils/api';
 
@@ -20,6 +20,8 @@ const Cart = () => {
         safetyContact: '',
         siteAccessCode: '',
     });
+
+
 
     useEffect(() => {
         const savedCart = localStorage.getItem('hydrogen_cart');
@@ -68,6 +70,8 @@ const Cart = () => {
         try {
             // Create order via API - match Supabase schema
             const totalQuantity = cart.reduce((acc, item) => acc + (item.quantity || 1), 0);
+
+            // Calculate Final Total
             const totalAmount = total * 1.05 + 50;
 
             // Format delivery address as text
@@ -277,6 +281,7 @@ const Cart = () => {
                                     <span>Processing Fee</span>
                                     <span>$50.00</span>
                                 </div>
+
                                 <div className="flex justify-between text-gray-600 dark:text-gray-400">
                                     <span>Tax (5%)</span>
                                     <span>${(total * 0.05).toFixed(2)}</span>
@@ -285,6 +290,8 @@ const Cart = () => {
                                     <span>Total</span>
                                     <span>${(total * 1.05 + 50).toFixed(2)}</span>
                                 </div>
+
+
                             </div>
 
                             <div className="space-y-4">

@@ -112,96 +112,78 @@ class LogisticsService:
             return None, None
 
     def optimize_order_fulfillment(self, order_details):
-        """Select best plant for order using HYBRID ML recommender (60% rule + 40% ML)"""
+        """Select best plant for order using HYBRID ML recommender"""
         try:
-            # Fetch all operational plants
-            response = supabase.table('plants').select('*').eq('status', 'operational').execute()
-            plants = response.data
-            
-            if not plants:
-                print("⚠️ No operational plants found")
-                return None
+            print(f"🔍 Optimizing Order: {order_details.get('id')}")
 
             # Import the HYBRID plant recommender
-            from models.plant_recommender import plant_recommender
+            from models.plant_recommender import HybridPlantRecommender
             
-            # Convert Supabase plant data to format expected by hybrid recommender
-            formatted_plants = []
-            for p in plants:
-                # Fetch latest production data for LCOH if available
-                try:
-                    prod_response = supabase.table('production_history')\
-                        .select('lcoh')\
-                        .eq('plant_id', p['id'])\
-                        .order('timestamp', desc=True)\
-                        .limit(1)\
-                        .execute()
-                    
-                    lcoh = prod_response.data[0]['lcoh'] if prod_response.data else 2.0
-                except:
-                    lcoh = 2.0
+            URL = os.getenv('SUPABASE_URL')
+            KEY = os.getenv('SUPABASE_SERVICE_ROLE_KEY') or os.getenv('SUPABASE_KEY')
+            GMAP = os.getenv('GOOGLE_MAPS_API_KEY')
+            
+            engine = HybridPlantRecommender(URL, KEY, GMAP)
+            
+            # Use the new single-order recommendation method
+            recommendation = engine.recommend_for_order(order_details)
+            
+            if not recommendation:
+                print("⚠️ No suitable plant found via AI Recommender")
+                return None
                 
-                # Build energy sources data (with defaults if not available)
-                energy_sources = p.get('energy_sources', {})
-                formatted_plant = {
-                    'id': p['id'],
-                    '_id': p['id'],  # For backward compatibility
-                    'name': p['name'],
-                    'capacity': p.get('capacity_mw', 50),  # TPD or MW
-                    'location': {
-                        'coordinates': {
-                            'lat': p.get('latitude', 0),
-                            'lng': p.get('longitude', 0)
-                        }
-                    },
-                    'lcoh': lcoh,
-                    'status': p['status'],
-                    'energySources': {
-                        'solar': {'current': energy_sources.get('solar', 0)},
-                        'wind': {'current': energy_sources.get('wind', 0)},
-                        'hydro': {'current': energy_sources.get('hydro', 0)}
-                    },
-                    'totalEnergyCapacity': p.get('capacity_mw', 50)
-                }
-                formatted_plants.append(formatted_plant)
+            selected_plant = recommendation['plant']
+            transport_method = recommendation['transport_method']
+            explanation = recommendation['explanation']
+            
+            print(f"✅ AI Selected: {selected_plant['name']} ({transport_method})")
+            
+            selected_vehicle = None
+            
+            # Update Order in DB with the decision immediately
+            update_payload = {
+                'assigned_plant_id': selected_plant['id'],
+                'transport_method': transport_method,
+                'ai_explanation': explanation,
+                'status': 'processing'
+            }
+            supabase.table('orders').update(update_payload).eq('id', order_details['id']).execute()
 
-            print(f"🔍 Analyzing {len(formatted_plants)} plants using HYBRID recommender...")
-            print(f"   Method: 60% Rule-Based + 40% TensorFlow ML")
-            
-            # Get recommendations using HYBRID scoring
-            recommendations = plant_recommender.recommend_plants(
-                formatted_plants, 
-                order_details, 
-                top_n=1
-            )
-            
-            if recommendations:
-                selected_plant = recommendations[0]
+            # Handle Transport
+            if transport_method == 'pipeline':
+                print("   🧪 Pipeline Transport - No Vehicle Assigned")
+                supabase.table('orders').update({'status': 'in-transit'}).eq('id', order_details['id']).execute()
                 
-                print(f"✅ Selected: {selected_plant['plant_name']}")
-                print(f"   Hybrid Score: {selected_plant['hybrid_score']:.3f}")
-                print(f"   - Rule-based: {selected_plant['rule_based_score']:.3f} (60%)")
-                print(f"   - ML Score: {selected_plant.get('ml_score', 'N/A')} (40%)")
-                
-                # Find nearest idle vehicle
+            else:
+                # Truck Transport - Find Vehicle
+                print("   🚛 Truck Transport - Searching for Vehicle...")
                 response = supabase.table('vehicles').select('*').eq('status', 'idle').execute()
                 vehicles = response.data
                 
-                selected_vehicle = None
                 if vehicles:
-                    selected_vehicle = vehicles[0]  # Pick first idle vehicle
-                    print(f"🚚 Assigned vehicle: {selected_vehicle.get('registration')}")
+                    selected_vehicle = vehicles[0]
+                    print(f"   🚚 Assigned vehicle: {selected_vehicle.get('registration')}")
+                    
+                    # Update Vehicle
+                    supabase.table('vehicles').update({
+                        'current_order': order_details['id'],
+                        'status': 'in-transit',
+                        'current_route': f"{selected_plant['name']} to {order_details.get('delivery_address', 'Customer')}"
+                    }).eq('id', selected_vehicle['id']).execute()
+                    
+                    # Update Order
+                    supabase.table('orders').update({'status': 'in-transit'}).eq('id', order_details['id']).execute()
                 else:
-                    print("⚠️ No idle vehicles available")
-                
-                return {
-                    'plant': selected_plant,
-                    'vehicle': selected_vehicle,
-                    'optimization_method': 'hybrid_ml_60_40'
-                }
-            
-            print("⚠️ No suitable plant found")
-            return None
+                    print("   ⚠️ No idle vehicles available for truck transport")
+                    raise Exception("No idle vehicles available for truck transport")
+
+            return {
+                'plant': selected_plant,
+                'vehicle': selected_vehicle, # Can be None if Pipeline
+                'transport_method': transport_method,
+                'explanation': explanation,
+                'optimization_method': 'hybrid_ai'
+            }
 
         except Exception as e:
             print(f"❌ Error optimizing order: {e}")
