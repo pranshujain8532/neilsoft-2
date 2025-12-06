@@ -11,6 +11,8 @@ interface PlantData {
     profit_prediction: any;
     safety_status: any;
     lcoh: number;
+    forecast?: any;
+    next_day_prediction?: any;
 }
 
 const Dashboard = () => {
@@ -256,6 +258,34 @@ const Dashboard = () => {
                                     </div>
                                 </div>
                             </div>
+
+                            {/* Next Day Forecast */}
+                            {plant.forecast && plant.next_day_prediction && (
+                                <div className="mb-6 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 p-4 rounded-lg border border-indigo-100 dark:border-indigo-800">
+                                    <h3 className="font-bold mb-3 flex items-center text-indigo-700 dark:text-indigo-300">
+                                        <TrendingUp className="w-4 h-4 mr-2" />
+                                        Next Day Forecast (Tomorrow)
+                                    </h3>
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                        <div>
+                                            <div className="text-gray-500 dark:text-gray-400 text-xs">Condition</div>
+                                            <div className="font-bold">{plant.forecast.description}</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-gray-500 dark:text-gray-400 text-xs">Temp (Max/Min)</div>
+                                            <div className="font-bold">{plant.forecast.max_temp}° / {plant.forecast.min_temp}°</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-gray-500 dark:text-gray-400 text-xs">Wind Speed</div>
+                                            <div className="font-bold">{plant.forecast.wind_speed} km/h</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-gray-500 dark:text-gray-400 text-xs">Predicted Output</div>
+                                            <div className="font-bold text-green-600">{plant.next_day_prediction.total} MW</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Safety Status */}
                             <div className={`p-4 rounded-lg border-2 ${plant.safety_status?.status === 'optimal'

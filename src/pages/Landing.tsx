@@ -1,151 +1,167 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowRight, Zap, Shield, TrendingUp, Leaf } from 'lucide-react';
-import SplineBackground from '@/components/SplineBackground';
+import { ArrowRight } from 'lucide-react';
+
+import CardSwap, { Card } from '@/components/CardSwap';
+import Silk from '@/components/Silk';
+import SplitText from '@/components/SplitText';
 
 const Landing = () => {
     return (
-        <div className="relative min-h-screen overflow-hidden">
-            {/* Spline 3D Background with Sunrise Animation */}
-            <SplineBackground />
+        <div className="relative min-h-screen w-full overflow-hidden flex items-center bg-[#0a0a0a]">
+            {/* Gradient Blinds Background - Removed Ballpit */}
 
-            {/* Hero Section */}
-            <section className="section-padding min-h-screen flex items-center justify-center relative z-10">
-                <div className="max-w-7xl mx-auto text-center">
+
+            {/* Main Content Grid */}
+            <div className="relative z-10 w-full max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-12 items-start pt-20">
+
+                {/* Left Column: Text Content */}
+                <div className="text-left">
                     <motion.div
-                        initial={{ opacity: 0, y: 30 }}
-                        animate={{ opacity: 1, y: 0 }}
+                        initial={{ opacity: 0, x: -50 }}
+                        animate={{ opacity: 1, x: 0 }}
                         transition={{ duration: 0.8 }}
                     >
-                        <h1 className="text-5xl md:text-7xl font-bold mb-6">
-                            <span className="gradient-text">Green Hydrogen</span>
-                            <br />
-                            <span className="text-gray-800 dark:text-white">For a Sustainable Future</span>
-                        </h1>
+                        <div className="mb-8">
+                            <SplitText
+                                text="Green Hydrogen"
+                                className="text-6xl md:text-8xl font-bold gradient-text block leading-tight"
+                                delay={50}
+                                tag="h1"
+                                textAlign="left"
+                            />
+                            <SplitText
+                                text="For a Sustainable Future"
+                                className="text-4xl md:text-6xl font-bold text-gray-800 dark:text-white mt-4 block leading-tight"
+                                delay={100}
+                                tag="h1"
+                                textAlign="left"
+                            />
+                        </div>
 
-                        <p className="text-xl md:text-2xl text-gray-600 dark:text-gray-300 mb-8 max-w-3xl mx-auto">
+                        <p className="text-xl text-gray-400 mb-10 max-w-xl leading-relaxed">
                             Smart AI-powered system for hydrogen production, storage, and transportation
-                            using renewable energy sources
+                            using renewable energy sources.
                         </p>
 
-                        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                            <Link to="/signup" className="btn-primary inline-flex items-center justify-center space-x-2">
+                        <div className="flex flex-wrap gap-4">
+                            <Link to="/signup" className="btn-primary inline-flex items-center justify-center space-x-2 px-8 py-4 text-lg">
                                 <span>Get Started</span>
-                                <ArrowRight size={20} />
+                                <ArrowRight size={24} />
                             </Link>
-                            <Link to="/login" className="btn-secondary">
+                            <Link to="/login" className="px-8 py-4 rounded-full bg-white/5 backdrop-blur-md border border-white/10 text-white hover:bg-white/10 transition-all text-lg">
                                 Sign In
                             </Link>
                         </div>
                     </motion.div>
-
-                    {/* Stats */}
-                    <motion.div
-                        initial={{ opacity: 0, y: 30 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.8, delay: 0.3 }}
-                        className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-20"
-                    >
-                        <div className="card-glass text-center">
-                            <h3 className="text-3xl font-bold text-hydrogen-500 mb-2">50+</h3>
-                            <p className="text-gray-600 dark:text-gray-300">TPD Production</p>
-                        </div>
-                        <div className="card-glass text-center">
-                            <h3 className="text-3xl font-bold text-green-500 mb-2">&lt;$2</h3>
-                            <p className="text-gray-600 dark:text-gray-300">Per kg LCOH</p>
-                        </div>
-                        <div className="card-glass text-center">
-                            <h3 className="text-3xl font-bold text-hydrogen-500 mb-2">99.9%</h3>
-                            <p className="text-gray-600 dark:text-gray-300">Hydrogen Purity</p>
-                        </div>
-                        <div className="card-glass text-center">
-                            <h3 className="text-3xl font-bold text-green-500 mb-2">100%</h3>
-                            <p className="text-gray-600 dark:text-gray-300">Renewable Energy</p>
-                        </div>
-                    </motion.div>
                 </div>
-            </section>
 
-            {/* Features Section */}
-            <section className="section-padding relative z-10">
-                <div className="max-w-7xl mx-auto">
-                    <motion.h2
-                        initial={{ opacity: 0 }}
-                        whileInView={{ opacity: 1 }}
-                        viewport={{ once: true }}
-                        className="text-4xl font-bold text-center mb-16 gradient-text"
-                    >
-                        Powered by Advanced Technology
-                    </motion.h2>
+                {/* Right Column: Card Swap */}
+                <div className="h-[600px] w-full flex items-start justify-center lg:justify-end relative perspective-1000 mt-32">
+                    <div className="w-[400px] h-[500px] relative">
+                        <CardSwap
+                            cardDistance={50}
+                            verticalDistance={40}
+                            delay={4000}
+                            pauseOnHover={true}
+                        >
+                            <Card>
+                                <div className="absolute inset-0 z-0 w-full h-full overflow-hidden rounded-[20px]">
+                                    <Silk color="#7B7481" />
+                                </div>
+                                {/* Window Header */}
+                                <div className="absolute top-0 left-0 right-0 h-12 bg-black/40 backdrop-blur-xl border-b border-white/10 flex items-center px-4 z-20 rounded-t-[20px]">
+                                    <div className="flex gap-2">
+                                        <div className="w-3 h-3 rounded-full bg-red-500/80" />
+                                        <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
+                                        <div className="w-3 h-3 rounded-full bg-green-500/80" />
+                                    </div>
+                                    <div className="ml-4 px-3 py-1 rounded-full bg-white/10 text-[10px] font-mono text-white/70 border border-white/5">
+                                        AI_Optimization.exe
+                                    </div>
+                                </div>
+                                <div className="h-full flex flex-col justify-center p-8 pt-20 text-left relative z-10">
+                                    <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center mb-6 backdrop-blur-md border border-white/20">
+                                        <span className="text-2xl">🤖</span>
+                                    </div>
+                                    <SplitText
+                                        text="AI-Powered Optimization"
+                                        className="text-3xl font-bold mb-4 text-white leading-tight"
+                                        tag="h3"
+                                        textAlign="left"
+                                    />
+                                    <p className="text-gray-300 text-sm leading-relaxed">
+                                        Advanced machine-learning models for safety monitoring, profit prediction, and logistics optimization.
+                                    </p>
+                                </div>
+                            </Card>
 
-                    <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-                        <FeatureCard
-                            icon={<Zap className="w-12 h-12 text-hydrogen-500" />}
-                            title="AI-Powered Optimization"
-                            description="Machine learning models for profit prediction, safety monitoring, and logistics optimization"
-                        />
-                        <FeatureCard
-                            icon={<Shield className="w-12 h-12 text-green-500" />}
-                            title="Blockchain Certification"
-                            description="Immutable guarantee of origin certificates on Polygon blockchain"
-                        />
-                        <FeatureCard
-                            icon={<TrendingUp className="w-12 h-12 text-hydrogen-500" />}
-                            title="Real-time Monitoring"
-                            description="Live IoT sensor data, fleet tracking, and production analytics"
-                        />
-                        <FeatureCard
-                            icon={<Leaf className="w-12 h-12 text-green-500" />}
-                            title="100% Renewable"
-                            description="Solar, wind, and hydropower integration with smart energy management"
-                        />
+                            <Card>
+                                <div className="absolute inset-0 z-0 w-full h-full overflow-hidden rounded-[20px]">
+                                    <Silk color="#4A90E2" />
+                                </div>
+                                {/* Window Header */}
+                                <div className="absolute top-0 left-0 right-0 h-12 bg-black/40 backdrop-blur-xl border-b border-white/10 flex items-center px-4 z-20 rounded-t-[20px]">
+                                    <div className="flex gap-2">
+                                        <div className="w-3 h-3 rounded-full bg-red-500/80" />
+                                        <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
+                                        <div className="w-3 h-3 rounded-full bg-green-500/80" />
+                                    </div>
+                                    <div className="ml-4 px-3 py-1 rounded-full bg-white/10 text-[10px] font-mono text-white/70 border border-white/5">
+                                        Real_Time_Monitoring.sys
+                                    </div>
+                                </div>
+                                <div className="h-full flex flex-col justify-center p-8 pt-20 text-left relative z-10">
+                                    <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center mb-6 backdrop-blur-md border border-white/20">
+                                        <span className="text-2xl">📊</span>
+                                    </div>
+                                    <SplitText
+                                        text="Real Time Analytics"
+                                        className="text-3xl font-bold mb-4 text-white leading-tight"
+                                        tag="h3"
+                                        textAlign="left"
+                                    />
+                                    <p className="text-gray-300 text-sm leading-relaxed">
+                                        Live IoT sensor data integration, fleet tracking, and comprehensive production analytics dashboard.
+                                    </p>
+                                </div>
+                            </Card>
+
+                            <Card>
+                                <div className="absolute inset-0 z-0 w-full h-full overflow-hidden rounded-[20px]">
+                                    <Silk color="#50C878" />
+                                </div>
+                                {/* Window Header */}
+                                <div className="absolute top-0 left-0 right-0 h-12 bg-black/40 backdrop-blur-xl border-b border-white/10 flex items-center px-4 z-20 rounded-t-[20px]">
+                                    <div className="flex gap-2">
+                                        <div className="w-3 h-3 rounded-full bg-red-500/80" />
+                                        <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
+                                        <div className="w-3 h-3 rounded-full bg-green-500/80" />
+                                    </div>
+                                    <div className="ml-4 px-3 py-1 rounded-full bg-white/10 text-[10px] font-mono text-white/70 border border-white/5">
+                                        Eco_Friendly.app
+                                    </div>
+                                </div>
+                                <div className="h-full flex flex-col justify-center p-8 pt-20 text-left relative z-10">
+                                    <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center mb-6 backdrop-blur-md border border-white/20">
+                                        <span className="text-2xl">🌱</span>
+                                    </div>
+                                    <SplitText
+                                        text="100% Renewable"
+                                        className="text-3xl font-bold mb-4 text-white leading-tight"
+                                        tag="h3"
+                                        textAlign="left"
+                                    />
+                                    <p className="text-gray-300 text-sm leading-relaxed">
+                                        Seamless integration with Solar, Wind, and Hydro power sources for sustainable hydrogen production.
+                                    </p>
+                                </div>
+                            </Card>
+                        </CardSwap>
                     </div>
                 </div>
-            </section>
-
-            {/* CTA Section */}
-            <section className="section-padding relative z-10">
-                <div className="max-w-4xl mx-auto text-center">
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        whileInView={{ opacity: 1, scale: 1 }}
-                        viewport={{ once: true }}
-                        className="p-12"
-                    >
-                        <h2 className="text-3xl font-bold mb-4">Ready to Go Green?</h2>
-                        <p className="text-gray-600 dark:text-gray-300 mb-8">
-                            Join the future of clean energy with our smart hydrogen production platform
-                        </p>
-                        <Link to="/signup" className="btn-primary inline-flex items-center space-x-2">
-                            <span>Start Your Journey</span>
-                            <ArrowRight size={20} />
-                        </Link>
-                    </motion.div>
-                </div>
-            </section>
+            </div>
         </div>
-    );
-};
-
-interface FeatureCardProps {
-    icon: React.ReactNode;
-    title: string;
-    description: string;
-}
-
-const FeatureCard = ({ icon, title, description }: FeatureCardProps) => {
-    return (
-        <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            whileHover={{ scale: 1.05 }}
-            className="card-glass p-6 text-center"
-        >
-            <div className="flex justify-center mb-4">{icon}</div>
-            <h3 className="text-xl font-bold mb-2">{title}</h3>
-            <p className="text-gray-600 dark:text-gray-300">{description}</p>
-        </motion.div>
     );
 };
 

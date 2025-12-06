@@ -35,6 +35,43 @@ class WeatherService:
             print(f"Weather API error: {e}, using mock data")
             return self._get_mock_weather(lat, lon)
     
+    def get_forecast_by_coords(self, lat: float, lon: float) -> Dict:
+        """Get next day forecast data by coordinates using Open-Meteo"""
+        try:
+            params = {
+                'latitude': lat,
+                'longitude': lon,
+                'daily': 'temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,shortwave_radiation_sum',
+                'timezone': 'auto',
+                'forecast_days': 2
+            }
+            
+            response = requests.get(self.base_url, params=params, timeout=5)
+            response.raise_for_status()
+            data = response.json()
+            
+            daily = data.get('daily', {})
+            # Index 1 is tomorrow (0 is today)
+            return {
+                'max_temp': daily.get('temperature_2m_max', [0, 0])[1],
+                'min_temp': daily.get('temperature_2m_min', [0, 0])[1],
+                'wind_speed': daily.get('wind_speed_10m_max', [0, 0])[1],
+                'solar_radiation': daily.get('shortwave_radiation_sum', [0, 0])[1], # MJ/m²
+                'precipitation': daily.get('precipitation_sum', [0, 0])[1],
+                'description': 'Sunny' if daily.get('precipitation_sum', [0, 0])[1] < 1 else 'Rainy'
+            }
+            
+        except Exception as e:
+            print(f"Weather Forecast API error: {e}, using mock data")
+            return {
+                'max_temp': 30.0,
+                'min_temp': 22.0,
+                'wind_speed': 15.0,
+                'solar_radiation': 20.0,
+                'precipitation': 0.0,
+                'description': 'Sunny (Mock)'
+            }
+    
     def get_weather_by_city(self, city: str, country_code: str = 'IN') -> Dict:
         """Get current weather data by city name (Geocoding first)"""
         try:

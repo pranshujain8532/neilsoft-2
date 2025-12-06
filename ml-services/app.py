@@ -16,6 +16,9 @@ from routes.chatbot import chatbot_bp
 from routes.logistics import logistics_bp
 from predictive_maintenance import maintenance_bp
 
+# --- NEW IMPORT ---
+from services.background_energy_service import BackgroundEnergyService 
+
 # Import services
 try:
     from services.weather_service import weather_service
@@ -252,6 +255,16 @@ def broadcast_updates():
             predictions = realtime_ml_service.get_latest_predictions()
             socketio.emit('prediction_broadcast', predictions)
 
+# --- INITIALIZE BACKGROUND AGGREGATOR ---
+# Use Service Role Key if available, else fall back to Anon Key (which might fail writes)
+SUPABASE_KEY_TO_USE = os.getenv('SUPABASE_SERVICE_ROLE_KEY') or os.getenv('SUPABASE_KEY')
+
+bg_energy_service = BackgroundEnergyService(
+    supabase_url=os.getenv('SUPABASE_URL'),
+    supabase_key=SUPABASE_KEY_TO_USE,
+    weather_api_key=os.getenv('WEATHER_API_KEY')
+)
+
 if __name__ == '__main__':
     print("=" * 70)
     print("🚀 Green Hydrogen ML Service Starting...")
@@ -271,6 +284,10 @@ if __name__ == '__main__':
         logistics_service.start()
         print("✅ Real-time ML service started")
         print("✅ Logistics service started")
+        
+        # --- START THE 4-HOUR AGGREGATOR ---
+        bg_energy_service.start()
+        print("✅ Background 4-Hour Aggregator started")
         
         # Test weather API
         weather_test = weather_service.test_api_key()

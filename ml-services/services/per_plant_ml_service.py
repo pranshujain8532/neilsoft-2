@@ -160,8 +160,21 @@ class PerPlantMLService:
                 plant['coordinates']['lng']
             )
             
+            # Fetch next day forecast
+            forecast = self.weather_service.get_forecast_by_coords(
+                plant['coordinates']['lat'],
+                plant['coordinates']['lng']
+            )
+            
             # Calculate energy production
             energy_output = self.calculate_energy_production(plant_id, weather)
+            
+            # Calculate next day prediction
+            next_day_output = self.calculate_energy_production(plant_id, {
+                'solar_irradiance': (forecast['solar_radiation'] * 1000 / 24), # Approx conversion MJ/m2/day to W/m2 avg
+                'wind_speed': forecast['wind_speed'],
+                'temperature': forecast['max_temp']
+            })
             
             # Run ML models
             profit_pred = self.run_profit_prediction(plant_id, energy_output, weather)
@@ -172,7 +185,9 @@ class PerPlantMLService:
                 'plant_name': plant['name'],
                 'location': plant['location'],
                 'weather': weather,
+                'forecast': forecast,
                 'energy_output': energy_output,
+                'next_day_prediction': next_day_output,
                 'profit_prediction': profit_pred,
                 'safety_status': safety_status,
                 'lcoh': plant['base_lcoh'],

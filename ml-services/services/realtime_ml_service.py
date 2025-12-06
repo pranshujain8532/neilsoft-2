@@ -175,7 +175,8 @@ class RealtimeMLService:
             
             load_dotenv()
             url = os.environ.get('SUPABASE_URL')
-            key = os.environ.get('SUPABASE_KEY')
+            # Use Service Role Key if available to bypass RLS
+            key = os.environ.get('SUPABASE_SERVICE_ROLE_KEY') or os.environ.get('SUPABASE_KEY')
             
             if not url or not key:
                 print("⚠️ Missing Supabase credentials, skipping DB update")
@@ -207,15 +208,8 @@ class RealtimeMLService:
                 production_kg = (capacity * 10) * (efficiency / 100) # Mock formula
                 lcoh = np.random.uniform(1.8, 2.5)
                 
-                prod_data = {
-                    'plant_id': plant_id,
-                    'production_kg': round(production_kg, 2),
-                    'efficiency_percent': round(efficiency, 2),
-                    'lcoh': round(lcoh, 2),
-                    'timestamp': datetime.now().isoformat()
-                }
-                
-                supabase.table('production_history').insert(prod_data).execute()
+                # NOTE: We no longer write to 'production_history' here. 
+                # That is now handled exclusively by BackgroundEnergyService.
                 
                 # 2. Generate & Save ML Predictions
                 # Profit Prediction
