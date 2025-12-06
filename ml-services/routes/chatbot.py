@@ -1,5 +1,5 @@
 """
-Chatbot endpoint using Gemini AI
+Chatbot endpoint using Gemini AI with Supabase integration
 """
 
 from flask import Blueprint, request, jsonify
@@ -14,23 +14,28 @@ def chat():
         data = request.json
         message = data.get('message', '')
         history = data.get('history', [])
+        user_id = data.get('user_id', None)
+        
+        # Debug logging
+        print(f"📨 Chat request: message='{message[:30]}...', user_id={user_id}")
         
         if not message:
             return jsonify({
-                'response': 'Please ask me a question about green hydrogen!',
+                'response': 'Please ask me a question about green hydrogen, our plants, or your orders!',
                 'success': True
             })
         
-        # Get response from Gemini
-        response = get_chatbot_response(message, history)
+        # Get response from Gemini with Supabase data
+        response = get_chatbot_response(message, history, user_id)
         
         return jsonify({
             'response': response,
             'success': True,
-            'model': 'Gemini AI'
+            'model': 'Gemini AI + Supabase'
         })
         
     except Exception as e:
+        print(f"Chatbot Route Error: {e}")
         return jsonify({
             'response': 'I apologize, but I encountered an error. Please try asking your question again.',
             'success': False,

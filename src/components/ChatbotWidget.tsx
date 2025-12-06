@@ -27,10 +27,21 @@ const ChatbotWidget = () => {
         setLoading(true);
 
         try {
+            // Get user_id from localStorage
+            const userStr = localStorage.getItem('user');
+            const user = userStr ? JSON.parse(userStr) : null;
+            const userId = user?.id || null;
+
+            console.log('Chatbot: Sending message with user_id:', userId, 'user:', user);
+
             const response = await fetch('http://localhost:5001/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: input, history: messages })
+                body: JSON.stringify({
+                    message: input,
+                    history: messages,
+                    user_id: userId  // Pass user_id for personalized queries
+                })
             });
 
             const data = await response.json();
@@ -80,8 +91,8 @@ const ChatbotWidget = () => {
                             {messages.map((msg, idx) => (
                                 <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                                     <div className={`max-w-[80%] p-3 rounded-lg ${msg.role === 'user'
-                                            ? 'bg-hydrogen-500 text-white'
-                                            : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+                                        ? 'bg-hydrogen-500 text-white'
+                                        : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
                                         }`}>
                                         {msg.content}
                                     </div>
