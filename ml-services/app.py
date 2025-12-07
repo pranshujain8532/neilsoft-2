@@ -14,10 +14,19 @@ from flasgger import Swagger
 from routes.predictions import predictions_bp
 from routes.chatbot import chatbot_bp
 from routes.logistics import logistics_bp
-from predictive_maintenance import maintenance_bp
+from routes.maintenance import maintenance_bp
+from routes.storage import storage_bp
 
 # --- NEW IMPORT ---
-from services.background_energy_service import BackgroundEnergyService 
+from services.background_energy_service import BackgroundEnergyService
+
+# Import Storage ML Service
+try:
+    from services.storage_ml_service import storage_ml_service
+    STORAGE_ML_ENABLED = True
+except ImportError as e:
+    print(f"⚠️  Storage ML service not available: {e}")
+    STORAGE_ML_ENABLED = False 
 
 # Import services
 try:
@@ -38,7 +47,8 @@ swagger = Swagger(app)
 app.register_blueprint(predictions_bp, url_prefix='/predict')
 app.register_blueprint(chatbot_bp, url_prefix='/chat')
 app.register_blueprint(logistics_bp, url_prefix='/logistics')
-app.register_blueprint(maintenance_bp, url_prefix='/ml/maintenance')
+app.register_blueprint(maintenance_bp, url_prefix='/maintenance')
+app.register_blueprint(storage_bp, url_prefix='/storage')
 
 @app.route('/')
 def home():
@@ -55,7 +65,8 @@ def home():
             'weather': '/api/weather/*',
             'realtime': '/api/realtime/*',
             'plants': '/api/plants/predictions',
-            'models_status': '/models/status'
+            'models_status': '/models/status',
+            'storage_ml': '/storage/*'
         }
     })
 
@@ -180,6 +191,11 @@ def models_status():
         'realtime_service': {
             'enabled': REALTIME_ENABLED,
             'running': realtime_ml_service.running if REALTIME_ENABLED else False
+        },
+        'storage_ml': {
+            'enabled': STORAGE_ML_ENABLED,
+            'running': storage_ml_service.running if STORAGE_ML_ENABLED else False,
+            'models': ['anomaly_detector', 'health_predictor', 'demand_forecaster', 'inventory_optimizer']
         }
     }
     
@@ -289,6 +305,11 @@ if __name__ == '__main__':
         bg_energy_service.start()
         print("✅ Background 4-Hour Aggregator started")
         
+        # --- START STORAGE ML SERVICE ---
+        if STORAGE_ML_ENABLED:
+            storage_ml_service.start()
+            print("✅ Storage ML service started (Anomaly Detection, Health Prediction, Demand Forecasting, Inventory Optimization)")
+        
         # Test weather API
         weather_test = weather_service.test_api_key()
         if weather_test['valid']:
@@ -303,6 +324,8 @@ if __name__ == '__main__':
     print(f"📡 Socket.IO enabled for real-time updates")
     print(f"🤖 Gemini chatbot ready")
     print(f"🏭 Per-plant ML predictions available")
+    if STORAGE_ML_ENABLED:
+        print(f"📦 Storage ML endpoints available at /storage/*")
     print()
     
     # Start background broadcast thread

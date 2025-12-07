@@ -147,12 +147,15 @@ const Dashboard = () => {
                                         <h2 className="text-2xl font-bold">{plant.plant_name}</h2>
                                         <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
                                             <MapPin className="w-3 h-3 mr-1" />
-                                            {plant.location}
+                                            {typeof plant.location === 'object'
+                                                ? `${plant.location?.city || ''}, ${plant.location?.state || 'India'}`
+                                                : plant.location || 'India'
+                                            }
                                         </div>
                                     </div>
                                 </div>
                                 <div className="text-right">
-                                    <div className="text-3xl font-bold gradient-text">${plant.lcoh.toFixed(2)}/kg</div>
+                                    <div className="text-3xl font-bold gradient-text">${(plant.lcoh || 0).toFixed(2)}/kg</div>
                                     <div className="text-xs text-gray-500">LCOH</div>
                                 </div>
                             </div>
@@ -252,8 +255,8 @@ const Dashboard = () => {
                                             <span className="font-bold text-purple-600">{plant.profit_prediction?.roi}%</span>
                                         </div>
                                         <div className="flex justify-between">
-                                            <span className="text-gray-600 dark:text-gray-400">ML Confidence:</span>
-                                            <span className="font-bold">{(plant.profit_prediction?.ml_confidence * 100).toFixed(0)}%</span>
+                                            <span className="text-gray-600 dark:text-gray-400">Model:</span>
+                                            <span className="font-bold">LSTM</span>
                                         </div>
                                     </div>
                                 </div>
@@ -302,10 +305,7 @@ const Dashboard = () => {
                                         </div>
                                     </div>
                                     <div className="text-sm text-gray-600 dark:text-gray-400">
-                                        Anomaly Score: {plant.safety_status?.anomaly_score?.toFixed(3)}
-                                        <span className="ml-2">
-                                            (Confidence: {(plant.safety_status?.confidence * 100).toFixed(0)}%)
-                                        </span>
+                                        Anomaly Score: {plant.safety_status?.anomaly_score?.toFixed(3) || '0.000'}
                                     </div>
                                 </div>
                             </div>

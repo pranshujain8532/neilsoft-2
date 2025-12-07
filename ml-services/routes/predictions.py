@@ -4,7 +4,14 @@ from datetime import datetime, timedelta
 
 predictions_bp = Blueprint('predictions', __name__)
 
-# Mock models - replace with actual trained models
+# Import models from models folder
+try:
+    from models.profit_predictor import profit_predictor as profit_pred_model
+    HAS_PROFIT_MODEL = True
+except ImportError:
+    HAS_PROFIT_MODEL = False
+
+# Fallback ProfitPredictor if model not available
 class ProfitPredictor:
     """
     LSTM-based profit prediction model
@@ -12,7 +19,11 @@ class ProfitPredictor:
     Output: Predicted profit for next 24 hours
     """
     def predict(self, data):
-        # Simplified prediction logic
+        # Use proper model if available
+        if HAS_PROFIT_MODEL:
+            return profit_pred_model.predict(data)
+        
+        # Simplified fallback prediction logic
         base_profit = 10000
         
         # Weather impact
@@ -39,7 +50,6 @@ class ProfitPredictor:
         
         return {
             'predictedProfit': round(predicted_profit, 2),
-            'confidence': 87,
             'breakdown': {
                 'machineFactor': machine_factor,
                 'laborFactor': labor_factor,
@@ -48,6 +58,7 @@ class ProfitPredictor:
                 'weatherMultiplier': weather_multiplier
             }
         }
+
 
 class SafetyMonitor:
     """

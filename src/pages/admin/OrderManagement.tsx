@@ -97,8 +97,7 @@ const OrderManagement = () => {
                 message += `📍 Source Plant: ${plantName}\n`;
                 message += `🔗 Transport: Road Delivery\n`;
                 if (res.data.vehicle) {
-                    message += `🚚 Vehicle: ${res.data.vehicle.registration}\n`;
-                    message += `👤 Driver: ${res.data.vehicle.driver}`;
+                    message += `🚚 Vehicle: ${res.data.vehicle.registration}`;
                 }
             }
 

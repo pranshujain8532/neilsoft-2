@@ -3,31 +3,26 @@ import time
 import numpy as np
 import requests
 import statistics
+import traceback
 from datetime import datetime
-from supabase import create_client
+from supabase import create_client, Client
+import os
 
-# Reuse your existing logic, but wrapped for buffering
+# --- IMPORT SHARED LOGIC ---
+# We import the global instance from the models package to ensure consistency
+# between the Real-time Dashboard and this Background History Logger.
 try:
-    import tensorflow as tf
-    from tensorflow import keras
-    from tensorflow.keras import layers
-    HAS_TF = True
+    from models.energy_forecaster import energy_forecaster
 except ImportError:
-    HAS_TF = False
+    print("⚠️ BackgroundService: Could not import energy_forecaster. Make sure models/energy_forecaster.py exists.")
+    energy_forecaster = None
 
 class BackgroundEnergyService:
     def __init__(self, supabase_url, supabase_key, weather_api_key):
-        self.supabase = create_client(supabase_url, supabase_key)
+        self.supabase: Client = create_client(supabase_url, supabase_key)
         self.weather_api_key = weather_api_key
         self.running = False
         
-        # ML Models (Same as before)
-        self.solar_model = None
-        self.wind_model = None
-        self.hydro_model = None
-        if HAS_TF:
-            self._build_models()
-
         # --- BUFFER CONFIGURATION ---
         self.data_buffer = {} # Stores 10-min snapshots: { plant_id: [records] }
         self.collection_interval = 600 # Collect data every 10 minutes (600s)
@@ -46,7 +41,7 @@ class BackgroundEnergyService:
         """Main loop: Collects often, Uploads rarely"""
         while self.running:
             try:
-                # 1. Collect Data (Fast Cycle)
+                # 1. Collect Data (Fast Cycle - Every 10 mins)
                 self._collect_snapshot()
                 
                 # 2. Check if 4 hours passed
@@ -57,39 +52,45 @@ class BackgroundEnergyService:
                     
             except Exception as e:
                 print(f"⚠️ Error in Background Energy Loop: {e}")
+                traceback.print_exc()
             
             # Sleep for collection interval
             time.sleep(self.collection_interval)
 
     def _collect_snapshot(self):
         """Fetches current data and stores in RAM buffer (No DB Upload yet)"""
-        plants = self.supabase.table('plants').select('*').execute().data
-        
-        for plant in plants:
-            pid = plant['id']
-            ptype = plant.get('plant_type', 'solar')
-            capacity = float(plant.get('capacity_mw') or 50)
+        try:
+            plants = self.supabase.table('plants').select('*').execute().data
             
-            # Fetch Live Weather
-            lat, lon = plant.get('latitude', 0), plant.get('longitude', 0)
-            weather = self._fetch_weather(lat, lon)
-            if not weather: continue
+            for plant in plants:
+                pid = plant['id']
+                ptype = plant.get('plant_type', 'solar')
+                capacity = float(plant.get('capacity_mw') or 50)
+                
+                # Fetch Live Weather
+                lat, lon = plant.get('latitude', 0), plant.get('longitude', 0)
+                weather = self._fetch_weather(lat, lon)
+                if not weather: continue
 
-            # Calculate Physics/ML Output
-            predicted_mw = self._predict_mw(ptype, capacity, weather)
+                # Calculate Output using the SHARED ML Model
+                predicted_mw = self._predict_mw_consistent(ptype, capacity, weather)
+                
+                # Initialize buffer for this plant if not exists
+                if pid not in self.data_buffer:
+                    self.data_buffer[pid] = []
+                
+                # Add snapshot to buffer
+                self.data_buffer[pid].append({
+                    'weather': weather,
+                    'output_mw': predicted_mw,
+                    'timestamp': datetime.now()
+                })
             
-            # Initialize buffer for this plant if not exists
-            if pid not in self.data_buffer:
-                self.data_buffer[pid] = []
+            count = len(next(iter(self.data_buffer.values()))) if self.data_buffer else 0
+            print(f"   Sampled {len(plants)} plants. Buffer depth: {count} samples.")
             
-            # Add snapshot to buffer
-            self.data_buffer[pid].append({
-                'weather': weather,
-                'output_mw': predicted_mw,
-                'timestamp': datetime.now()
-            })
-        
-        print(f"   Sampled {len(plants)} plants. Buffer size: {len(next(iter(self.data_buffer.values())))} samples.")
+        except Exception as e:
+            print(f"Snapshot Error: {e}")
 
     def _process_averages_and_upload(self):
         """Calculates 4-hour averages and uploads to Supabase"""
@@ -98,117 +99,134 @@ class BackgroundEnergyService:
         history_batch = []
         prediction_batch = []
         
-        for pid, records in self.data_buffer.items():
-            if not records: continue
-            
-            # --- CALCULATE AVERAGES ---
-            avg_mw = statistics.mean([r['output_mw'] for r in records])
-            
-            # Average Weather (Extract keys, avg them, rebuild dict)
-            avg_weather = {}
-            keys = records[0]['weather'].keys() # temp, speed, etc
-            for k in keys:
-                values = [r['weather'][k] for r in records if isinstance(r['weather'][k], (int, float))]
-                if values:
-                    avg_weather[k] = round(sum(values) / len(values), 2)
-            
-            # --- PREPARE DB UPLOAD ---
-            
-            # 1. Production History (The "Actual" Average)
-            history_batch.append({
-                'plant_id': pid,
-                'production_kg': 0, 
-                'energy_generated_mw': round(avg_mw, 2),
-                'weather_snapshot': avg_weather,
-                'timestamp': datetime.now().isoformat()
-            })
+        # We process whatever is in the buffer
+        if not self.data_buffer:
+            print("   ⚠️ Buffer empty, skipping upload.")
+            return
 
-            # 2. Prediction (For Next 4 Hours - Using the trend)
-            # Simple logic: Assume next 4 hours is similar to avg of last 4 hours (Persistence Model)
-            prediction_batch.append({
-                'plant_id': pid,
-                'prediction_type': '4hr_avg_forecast',
-                'input_data': {'source': '4hr_rolling_avg', 'weather': avg_weather},
-                'output_data': {'expected_mw': round(avg_mw, 2), 'confidence': 0.90},
-                'created_at': datetime.now().isoformat()
-            })
-
-            # 3. Profit Prediction (Using the Profit Model)
-            try:
-                from models.profit_predictor import profit_predictor
+        try:
+            for pid, records in self.data_buffer.items():
+                if not records: continue
                 
-                # Convert MW to approx kg H2 (Mock conversion: 1 MW ~ 20 kg/hr * 4 hrs)
-                est_production_kg = avg_mw * 20 * 4 
+                # --- CALCULATE AVERAGES ---
+                avg_mw = statistics.mean([r['output_mw'] for r in records])
                 
-                # Mock cost factors (In real app, fetch from DB)
-                lcoh = 2.5 
-                labor_cost = 500
+                # Average Weather (Extract keys, avg them, rebuild dict)
+                avg_weather = {}
+                keys = records[0]['weather'].keys() 
+                for k in keys:
+                    values = [r['weather'][k] for r in records if isinstance(r['weather'][k], (int, float))]
+                    if values:
+                        avg_weather[k] = round(sum(values) / len(values), 2)
                 
-                profit_input = {
+                # --- PREPARE DB UPLOAD ---
+                
+                # 1. Production History (The "Ground Truth" for training)
+                history_batch.append({
                     'plant_id': pid,
-                    'currentProduction': est_production_kg,
-                    'lcoh': lcoh,
-                    'labor_cost': labor_cost
-                }
-                
-                # Get prediction (Don't save internally, we'll batch save)
-                profit_result = profit_predictor.predict(profit_input, save_to_db=False)
-                
+                    'production_kg': 0, # Legacy field
+                    'energy_generated_mw': round(avg_mw, 2),
+                    'weather_snapshot': avg_weather,
+                    'timestamp': datetime.now().isoformat()
+                })
+
+                # 2. Prediction (Persistence Forecast)
                 prediction_batch.append({
                     'plant_id': pid,
-                    'prediction_type': 'profitability',
-                    'input_data': profit_input,
-                    'output_data': profit_result,
+                    'prediction_type': '4hr_avg_forecast',
+                    'input_data': {'source': '4hr_rolling_avg', 'weather': avg_weather},
+                    'output_data': {'expected_mw': round(avg_mw, 2), 'confidence': 0.90},
                     'created_at': datetime.now().isoformat()
                 })
+
+            # --- BULK INSERT ---
+            if history_batch:
+                self.supabase.table('production_history').insert(history_batch).execute()
+                print(f"✅ Uploaded {len(history_batch)} aggregated history records.")
                 
-            except Exception as e:
-                print(f"⚠️ Profit Prediction Error: {e}")
+            if prediction_batch:
+                self.supabase.table('ml_predictions').insert(prediction_batch).execute()
+                print(f"✅ Uploaded {len(prediction_batch)} forecast records.")
 
-        # --- BULK INSERT ---
-        if history_batch:
-            self.supabase.table('production_history').insert(history_batch).execute()
-            print(f"✅ Uploaded {len(history_batch)} aggregated history records.")
+            # Clear Buffer ONLY after successful upload
+            self.data_buffer = {} 
+            print("✅ RAM Buffer flushed.")
+
+        except Exception as e:
+            print(f"❌ Upload Failed! Keeping data in buffer for retry. Error: {e}")
+
+    # --- UPDATED: CONSISTENT PREDICTION LOGIC ---
+    def _predict_mw_consistent(self, ptype, capacity, w):
+        """
+        Uses the shared 'energy_forecaster' so History matches Dashboard.
+        """
+        if not energy_forecaster:
+            # Fallback if import failed
+            return capacity * 0.5
+
+        # 1. Map our flattened weather dict to what EnergyForecaster expects
+        # EnergyForecaster expects keys like: 'irradiance', 'temperature', 'hour', etc.
+        
+        # Heuristics for missing Hydro data
+        # (Hydro usually needs flow sensors, here we estimate based on humidity/rain if available)
+        est_flow = 50 + (w.get('humidity', 50) * 0.5) 
+        
+        # Estimate Irradiance from Cloud Cover if API didn't provide it
+        irr = w.get('solar_irradiance', 0)
+        if irr == 0 and w.get('clouds') is not None:
+             irr = (100 - w['clouds']) * 10 
+
+        model_input = {
+            'irradiance': irr,
+            'temperature': w.get('temp', 25),
+            'hour': datetime.now().hour,
+            'wind_speed': w.get('wind_speed', 5),
+            'wind_direction': w.get('wind_deg', 0),
+            'water_flow': est_flow,
+            'head_height': 100 # Default constant
+        }
+
+        # 2. Prepare Capacity Dict
+        # The forecaster scales its output based on this dict
+        capacity_dict = {
+            ptype: capacity 
+        }
+
+        # 3. Get Prediction
+        # forecast_energy returns a dict: {'solar_mw': ..., 'wind_mw': ..., 'total_mw': ...}
+        result = energy_forecaster.forecast_energy(model_input, capacity_dict)
+
+        # 4. Extract specific value
+        if ptype == 'solar':
+            return result.get('solar_mw', 0)
+        elif ptype == 'wind':
+            return result.get('wind_mw', 0)
+        elif ptype == 'hydro':
+            return result.get('hydro_mw', 0)
             
-        if prediction_batch:
-            self.supabase.table('ml_predictions').insert(prediction_batch).execute()
-            print(f"✅ Uploaded {len(prediction_batch)} forecast/profit records.")
-
-        # Clear Buffer
-        self.data_buffer = {} 
+        return result.get('total_mw', 0)
 
     # --- Helpers ---
     def _fetch_weather(self, lat, lon):
         try:
-            # Use the shared WeatherService (Open-Meteo)
-            from services.weather_service import weather_service
-            w_data = weather_service.get_weather_by_coords(lat, lon)
+            # Note: In production, consider caching this call if plants are close
+            url = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={self.weather_api_key}&units=metric"
+            data = requests.get(url, timeout=10).json()
             
-            # Map Open-Meteo keys to what our logic expects
+            if data.get('cod') != 200:
+                return None
+
             return {
-                'temp': w_data.get('temperature', 25),
-                'pressure': w_data.get('pressure', 1013),
-                'humidity': w_data.get('humidity', 50),
-                'wind_speed': w_data.get('wind_speed', 5),
-                'wind_deg': w_data.get('wind_direction', 0),
-                'clouds': w_data.get('cloud_cover', 0),
-                'solar_irradiance': w_data.get('solar_irradiance', 0)
+                'temp': data['main']['temp'],
+                'pressure': data['main']['pressure'],
+                'humidity': data['main']['humidity'],
+                'wind_speed': data['wind']['speed'],
+                'wind_deg': data['wind'].get('deg', 0),
+                'clouds': data['clouds']['all'],
+                # OpenWeatherMap Standard doesn't always give irradiance, 
+                # so we might default to 0 and calc it in _predict_mw_consistent
+                'solar_irradiance': 0 
             }
         except Exception as e:
-            print(f"⚠️ Weather Fetch Error: {e}")
+            # print(f"⚠️ Weather Fetch Error: {e}") 
             return None
-
-    def _predict_mw(self, ptype, capacity, w):
-        # Your specific physics/ML logic here
-        if ptype == 'solar':
-            return (capacity * 0.18) * ((100-w['clouds'])/100) # Simplified
-        elif ptype == 'wind':
-            if 3 < w['wind_speed'] < 25:
-                return capacity * (w['wind_speed']**3)/(12**3)
-        elif ptype == 'hydro':
-             return capacity * 0.7 # Placeholder
-        return 0
-
-    def _build_models(self):
-        # Initialize Keras models here if needed for deeper prediction
-        pass

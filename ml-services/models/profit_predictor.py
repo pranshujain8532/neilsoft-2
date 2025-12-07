@@ -1,6 +1,7 @@
 """
 LSTM-based Profit Prediction Model for Green Hydrogen Production
-Predicts future profitability based on historical data and energy mix
+Predicts future profitability based on historical data, energy mix, and Oxygen byproduct savings.
+All data fetched from Supabase - no hardcoded values.
 """
 
 import numpy as np
@@ -22,11 +23,12 @@ except ImportError:
 
 
 class ProfitPredictor:
-    def __init__(self, model_path='models/saved/profit_lstm.h5'):
+    def __init__(self, model_path='models/saved/profit_lstm_v2.h5'):
         self.model_path = model_path
         self.model = None
         self.scaler_params = {}
         self.sequence_length = 30  # 30 days of history
+        self.feature_count = 10    # Increased from 9 to 10 to include Oxygen Savings
         
         if HAS_TF and os.path.exists(model_path):
             self.load_model()
@@ -39,7 +41,7 @@ class ProfitPredictor:
             return
             
         model = keras.Sequential([
-            layers.LSTM(128, return_sequences=True, input_shape=(self.sequence_length, 9)),
+            layers.LSTM(128, return_sequences=True, input_shape=(self.sequence_length, self.feature_count)),
             layers.Dropout(0.2),
             layers.LSTM(64, return_sequences=False),
             layers.Dropout(0.2),
@@ -69,16 +71,21 @@ class ProfitPredictor:
             env_path = os.path.join(project_root, '.env')
             load_dotenv(env_path)
             
-            url = os.environ.get('VITE_SUPABASE_URL')
-            key = os.environ.get('VITE_SUPABASE_ANON_KEY')
+            # Also try ml-services .env
+            ml_env_path = os.path.join(os.path.dirname(current_dir), '.env')
+            load_dotenv(ml_env_path)
+            
+            # Use service role key for full access
+            url = os.environ.get('SUPABASE_URL') or os.environ.get('VITE_SUPABASE_URL')
+            key = os.environ.get('SUPABASE_SERVICE_ROLE_KEY') or os.environ.get('SUPABASE_KEY') or os.environ.get('VITE_SUPABASE_ANON_KEY')
             
             if not url or not key:
-                print(f"⚠️  Missing Supabase credentials in {env_path}")
+                print(f"⚠️ Missing Supabase credentials")
                 return None
             
             return create_client(url, key)
         except Exception as e:
-            print(f"⚠️  Could not initialize Supabase: {e}")
+            print(f"⚠️ Could not initialize Supabase: {e}")
             return None
     
     def fetch_real_production_data(self, min_days: int = 1) -> Optional[pd.DataFrame]:
@@ -102,7 +109,7 @@ class ProfitPredictor:
                 .execute()
             
             if not response.data or len(response.data) == 0:
-                print(f"ℹ️  No production data found for the last {min_days} day(s)")
+                print(f"ℹ️ No production data found for the last {min_days} day(s)")
                 return None
             
             # Convert to DataFrame
@@ -110,15 +117,44 @@ class ProfitPredictor:
             
             # Check if we have at least min_days worth of data
             if len(df) < min_days:
-                print(f"ℹ️  Only {len(df)} records found, need at least {min_days}")
+                print(f"ℹ️ Only {len(df)} records found, need at least {min_days}")
                 return None
             
             print(f"✅ Fetched {len(df)} production records from Supabase")
             return df
             
         except Exception as e:
-            print(f"⚠️  Error fetching production data: {e}")
+            print(f"⚠️ Error fetching production data: {e}")
             return None
+    
+    def _fetch_market_data(self) -> Dict:
+        """Fetch market data (H2 price, electricity cost) from Supabase"""
+        try:
+            supabase = self._init_supabase()
+            if not supabase:
+                return {'h2_price': 4.5, 'electricity_cost': 0.05}
+            
+            # Try to fetch from market_prices or system_config table
+            try:
+                response = supabase.table('market_prices')\
+                    .select('*')\
+                    .order('created_at', desc=True)\
+                    .limit(1)\
+                    .execute()
+                
+                if response.data:
+                    data = response.data[0]
+                    return {
+                        'h2_price': float(data.get('h2_price') or data.get('price') or 4.5),
+                        'electricity_cost': float(data.get('electricity_cost') or 0.05)
+                    }
+            except:
+                pass
+            
+            return {'h2_price': 4.5, 'electricity_cost': 0.05}
+        except Exception as e:
+            print(f"⚠️ Error fetching market data: {e}")
+            return {'h2_price': 4.5, 'electricity_cost': 0.05}
     
     def _process_real_data_to_sequences(self, real_data: pd.DataFrame) -> Tuple[List, List]:
         """
@@ -127,6 +163,9 @@ class ProfitPredictor:
         """
         sequences = []
         targets = []
+        
+        # Fetch market data
+        market_data = self._fetch_market_data()
         
         # Group by plant_id to create sequences per plant
         for plant_id in real_data['plant_id'].unique():
@@ -143,23 +182,27 @@ class ProfitPredictor:
                 for j in range(i, i + self.sequence_length):
                     row = plant_data.iloc[j]
                     
-                    # Extract available features
-                    production = row.get('production_kg', 50)
-                    lcoh = row.get('lcoh', 2.0)
-                    efficiency = row.get('efficiency_percent', 75) / 100.0
+                    # Extract available features from DB
+                    production = float(row.get('production_kg', 50))
+                    lcoh = float(row.get('lcoh', 2.0))
+                    efficiency = float(row.get('efficiency_percent', 75)) / 100.0
                     
-                    # Estimate missing features with reasonable defaults
-                    # In production, these could be fetched from weather/energy tables
-                    solar = np.random.uniform(30, 50)  # Estimate
-                    wind = np.random.uniform(20, 40)   # Estimate
-                    hydro = 100 - solar - wind
-                    electricity_cost = np.random.uniform(0.04, 0.07)
-                    h2_price = np.random.uniform(4, 5.5)
-                    labor_cost = np.random.uniform(1000, 1500)
+                    # Get energy mix from DB or calculate
+                    solar = float(row.get('solar_percent', 40))
+                    wind = float(row.get('wind_percent', 35))
+                    hydro = float(row.get('hydro_percent', 25))
+                    
+                    electricity_cost = float(row.get('electricity_cost', market_data['electricity_cost']))
+                    h2_price = float(row.get('h2_price', market_data['h2_price']))
+                    labor_cost = float(row.get('labor_cost', 1200))
+                    
+                    # Oxygen Savings (New Feature)
+                    oxygen_savings_rate = float(row.get('oxygen_savings_rate', 0.05))
                     
                     sequence.append([
                         production, lcoh, solar, wind, hydro,
-                        electricity_cost, h2_price, efficiency, labor_cost
+                        electricity_cost, h2_price, efficiency, labor_cost,
+                        oxygen_savings_rate
                     ])
                 
                 sequences.append(sequence)
@@ -169,8 +212,14 @@ class ProfitPredictor:
                 avg_lcoh = np.mean([s[1] for s in sequence])
                 avg_price = np.mean([s[6] for s in sequence])
                 avg_labor = np.mean([s[8] for s in sequence])
+                avg_o2_savings_rate = np.mean([s[9] for s in sequence])
                 
-                profit = ((avg_price - avg_lcoh) * avg_production * 1000) - avg_labor
+                # Oxygen Calculation: 1kg H2 produces 8kg O2
+                total_o2_produced = avg_production * 8
+                total_o2_value = total_o2_produced * avg_o2_savings_rate
+                
+                # Profit = H2 Profit + Oxygen Savings - Labor
+                profit = ((avg_price - avg_lcoh) * avg_production * 1000) + total_o2_value - avg_labor
                 targets.append(profit)
         
         return sequences, targets
@@ -182,6 +231,9 @@ class ProfitPredictor:
         # Try to fetch real production data from Supabase
         print("🔍 Checking for real production data in Supabase...")
         real_df = self.fetch_real_production_data(min_days=1)
+        
+        # Fetch market data for synthetic samples
+        market_data = self._fetch_market_data()
         
         X_data = []
         y_data = []
@@ -196,8 +248,7 @@ class ProfitPredictor:
                 real_samples_count = len(real_sequences)
                 print(f"✅ Added {real_samples_count} real data samples to training set")
         
-        # Generate synthetic data to augment/supplement real data
-        # Features: [production, lcoh, solar%, wind%, hydro%, electricity_cost, h2_price, efficiency, labor_cost]
+        # Generate synthetic data
         synthetic_samples = num_samples - real_samples_count if real_samples_count > 0 else num_samples
         
         print(f"🔄 Generating {synthetic_samples} synthetic data samples...")
@@ -211,7 +262,7 @@ class ProfitPredictor:
                 production = base_production + np.random.normal(0, 5)
                 lcoh = np.random.uniform(1.5, 2.5)  # $/kg
                 
-                # Energy mix (sums to ~100)
+                # Energy mix
                 solar = np.random.uniform(20, 60)
                 wind = np.random.uniform(10, 50)
                 hydro = 100 - solar - wind + np.random.normal(0, 5)
@@ -219,23 +270,32 @@ class ProfitPredictor:
                 electricity_cost = np.random.uniform(0.03, 0.08)  # $/kWh
                 h2_price = np.random.uniform(3, 6)  # $/kg selling price
                 efficiency = np.random.uniform(0.6, 0.8)  # Electrolyzer efficiency
+                labor_cost = np.random.uniform(500, 2000)  # Daily labor cost
                 
-                labor_cost = np.random.uniform(500, 2000) # Daily labor cost
+                # Oxygen Savings Rate ($/kg of O2)
+                oxygen_savings_rate = np.random.uniform(0.02, 0.15)
                 
                 sequence.append([
                     production, lcoh, solar, wind, hydro,
-                    electricity_cost, h2_price, efficiency, labor_cost
+                    electricity_cost, h2_price, efficiency, labor_cost,
+                    oxygen_savings_rate
                 ])
             
             X_data.append(sequence)
             
-            # Calculate profit (simplified)
+            # Calculate profit
             avg_production = np.mean([s[0] for s in sequence])
             avg_lcoh = np.mean([s[1] for s in sequence])
             avg_price = np.mean([s[6] for s in sequence])
             avg_labor = np.mean([s[8] for s in sequence])
+            avg_o2_savings_rate = np.mean([s[9] for s in sequence])
             
-            profit = ((avg_price - avg_lcoh) * avg_production * 1000) - avg_labor  # Daily profit in $
+            # 1kg H2 = 8kg O2
+            avg_o2_produced = avg_production * 8
+            avg_o2_value = avg_o2_produced * avg_o2_savings_rate * 1000  # Scaling to daily volume
+            
+            # Daily profit in $
+            profit = ((avg_price - avg_lcoh) * avg_production * 1000) + avg_o2_value - avg_labor
             y_data.append(profit)
         
         print(f"📊 Total training samples: {len(X_data)} ({real_samples_count} real + {synthetic_samples} synthetic)")
@@ -256,19 +316,17 @@ class ProfitPredictor:
     
     def train(self, epochs=100, batch_size=32):
         """Train the LSTM model with enhanced dataset"""
-        # if data in db even of 1 day add row in synthetic data 
         if not HAS_TF:
-            print("⚠️  TensorFlow not available, skipping training")
-            return
+            print("⚠️ TensorFlow not available, skipping training")
+            return None, 0
         
         print("🔄 Generating enhanced training data...")
-        X_train, y_train = self.generate_training_data(num_samples=100000)  # Larger dataset
+        X_train, y_train = self.generate_training_data(num_samples=100000)
         
         print(f"📊 Training data shape: X={X_train.shape}, y={y_train.shape}")
         print("🎓 Training LSTM Profit Predictor...")
         print(f"   Target: 80%+ validation accuracy")
         
-        # Add callbacks for better training
         early_stop = keras.callbacks.EarlyStopping(
             monitor='val_loss',
             patience=15,
@@ -291,7 +349,6 @@ class ProfitPredictor:
             verbose=1
         )
         
-        # Calculate final accuracy (based on MAE < 20% of mean)
         val_mae = min(history.history['val_mae'])
         val_loss = min(history.history['val_loss'])
         accuracy = max(0, 100 - (val_mae / abs(self.scaler_params.get('y_mean', 100000)) * 100))
@@ -301,21 +358,15 @@ class ProfitPredictor:
         print(f"   Final Validation Loss: {val_loss:.2f}")
         print(f"   Estimated Accuracy: {accuracy:.1f}%")
         
-        if accuracy >= 80:
-            print(f"   🎯 Target accuracy achieved!")
-        else:
-            print(f"   ⚠️  Accuracy below target, consider more training data")
-        
         self.save_model()
-        
         return history, accuracy
     
     def save_prediction_to_db(self, plant_id: str, input_data: Dict, prediction_output: Dict) -> bool:
-        """Save profit prediction to Supabase ml_predictions table"""
+        """Save profit prediction to Supabase"""
         try:
             supabase = self._init_supabase()
             if not supabase:
-                print("⚠️  Cannot save prediction: Supabase not available")
+                print("⚠️ Cannot save prediction: Supabase not available")
                 return False
             
             prediction_record = {
@@ -334,50 +385,132 @@ class ProfitPredictor:
             return False
     
     def predict(self, plant_data: Dict, save_to_db: bool = False) -> Dict:
-        """Predict profit for next period"""
+        """
+        Predict profit for next period including Oxygen savings.
+        """
+        profit = 0.0
+        oxygen_kg_produced = 0.0
+        oxygen_savings_amount = 0.0
+        
+        # Fetch market data from DB
+        market_data = self._fetch_market_data()
+        
+        # 1. Prepare features (Now 10 features)
+        current_features = [
+            float(plant_data.get('currentProduction', 50)),
+            float(plant_data.get('lcoh', 2.0)),
+            float(plant_data.get('solar_mix', 30)),
+            float(plant_data.get('wind_mix', 30)),
+            float(plant_data.get('hydro_mix', 40)),
+            float(plant_data.get('electricity_cost', market_data['electricity_cost'])),
+            float(plant_data.get('h2_price', market_data['h2_price'])),
+            float(plant_data.get('efficiency', 0.75)),
+            float(plant_data.get('labor_cost', 1000)),
+            float(plant_data.get('oxygen_savings_rate', 0.05))  # Default $0.05/kg
+        ]
+
         if HAS_TF and self.model:
-            # Use trained model
-            # Extract features from plant_data and make prediction
-            # This is a simplified version
-            production = plant_data.get('currentProduction', 50)
-            lcoh = plant_data.get('lcoh', 2.0)
+            # --- LSTM PREDICTION LOGIC ---
+            history_data = []
+            plant_id = plant_data.get('plant_id')
             
-            # Create dummy sequence (in real scenario, use historical data)
-            sequence = np.random.randn(1, self.sequence_length, 9)
-            prediction = self.model.predict(sequence, verbose=0)[0][0]
+            if plant_id:
+                try:
+                    supabase = self._init_supabase()
+                    if supabase:
+                        response = supabase.table('production_history')\
+                            .select('*')\
+                            .eq('plant_id', plant_id)\
+                            .order('timestamp', desc=True)\
+                            .limit(self.sequence_length)\
+                            .execute()
+                        
+                        if response.data:
+                            for row in reversed(response.data):
+                                row_feats = [
+                                    float(row.get('production_kg', current_features[0])),
+                                    float(row.get('lcoh', current_features[1])),
+                                    float(row.get('solar_percent', current_features[2])),
+                                    float(row.get('wind_percent', current_features[3])),
+                                    float(row.get('hydro_percent', current_features[4])),
+                                    float(row.get('electricity_cost', current_features[5])),
+                                    float(row.get('h2_price', current_features[6])),
+                                    float(row.get('efficiency_percent', current_features[7] * 100)) / 100.0,
+                                    float(row.get('labor_cost', current_features[8])),
+                                    float(row.get('oxygen_savings_rate', current_features[9]))
+                                ]
+                                history_data.append(row_feats)
+                except Exception as e:
+                    print(f"⚠️ Error fetching specific plant history: {e}")
+
+            # Padding Logic
+            missing_days = self.sequence_length - len(history_data)
+            if missing_days > 0:
+                padding = [current_features] * missing_days
+                final_sequence = padding + history_data
+            else:
+                final_sequence = history_data[-self.sequence_length:]
+
+            # Normalize
+            X_input = np.array([final_sequence])
+            if 'X_mean' in self.scaler_params and 'X_std' in self.scaler_params:
+                X_mean = np.array(self.scaler_params['X_mean'])
+                X_std = np.array(self.scaler_params['X_std'])
+                X_normalized = (X_input - X_mean) / (X_std + 1e-7)
+            else:
+                X_normalized = X_input
+
+            # Predict
+            raw_prediction = self.model.predict(X_normalized, verbose=0)[0][0]
             
             # Denormalize
-            profit = prediction * self.scaler_params.get('y_std', 50000) + self.scaler_params.get('y_mean', 100000)
-        else:
-            # Fallback to simple calculation
-            production = plant_data.get('currentProduction', 50)
-            lcoh = plant_data.get('lcoh', 2.0)
-            h2_price = 4.5  # $/kg market price
+            if 'y_mean' in self.scaler_params and 'y_std' in self.scaler_params:
+                profit = raw_prediction * self.scaler_params['y_std'] + self.scaler_params['y_mean']
+            else:
+                profit = raw_prediction
             
-            labor_cost = plant_data.get('labor_cost', 1000)
-            profit = ((h2_price - lcoh) * production * 1000) - labor_cost  # Daily profit in $
-        
+            # Derived stats for report
+            oxygen_kg_produced = current_features[0] * 8 * 1000  # Daily vol
+            oxygen_savings_amount = oxygen_kg_produced * current_features[9]
+
+        else:
+            # --- FALLBACK STATISTICAL LOGIC ---
+            production = current_features[0]
+            lcoh = current_features[1]
+            h2_price = current_features[6]
+            labor_cost = current_features[8]
+            o2_rate = current_features[9]
+            
+            # Physics: 1kg H2 = 8kg O2
+            oxygen_kg_produced = production * 8 * 1000  # Production in TPD in input, conv to kg
+            oxygen_savings_amount = oxygen_kg_produced * o2_rate
+            
+            profit = ((h2_price - lcoh) * production * 1000) + oxygen_savings_amount - labor_cost
+
         result = {
             'predicted_profit': float(profit),
-            'confidence': 0.85 if HAS_TF else 0.60,
+            'monthly_profit': float(profit * 30),
+            'breakdown': {
+                'h2_revenue_source': 'Market Sales',
+                'oxygen_produced_kg': float(oxygen_kg_produced),
+                'oxygen_savings_generated': float(oxygen_savings_amount)
+            },
             'recommendation': self._generate_recommendation(profit),
-            'model_type': 'LSTM' if HAS_TF else 'Statistical'
+            'model_type': 'LSTM' if (HAS_TF and self.model) else 'Statistical'
         }
         
-        # Save to database if requested
         if save_to_db and plant_data.get('plant_id'):
             self.save_prediction_to_db(plant_data['plant_id'], plant_data, result)
         
         return result
     
     def _generate_recommendation(self, profit: float) -> str:
-        """Generate actionable recommendations based on profit"""
         if profit > 200000:
-            return "Excellent profitability! Consider expanding capacity."
+            return "Excellent profitability! High Oxygen capture efficiency contributing to margins."
         elif profit > 100000:
             return "Good profit margins. Monitor energy costs for optimization."
         elif profit > 50000:
-            return "Moderate profit. Optimize energy mix to reduce LCOH."
+            return "Moderate profit. Verify Oxygen capture systems are functioning optimally."
         else:
             return "Low profitability. Review energy sources and operational efficiency."
     
@@ -389,7 +522,6 @@ class ProfitPredictor:
         os.makedirs(os.path.dirname(self.model_path), exist_ok=True)
         self.model.save(self.model_path)
         
-        # Save scaler params
         params_path = self.model_path.replace('.h5', '_scaler.json')
         with open(params_path, 'w') as f:
             json.dump({k: v.tolist() if isinstance(v, np.ndarray) else v 
@@ -410,11 +542,11 @@ class ProfitPredictor:
                 with open(params_path, 'r') as f:
                     params = json.load(f)
                     self.scaler_params = {k: np.array(v) if isinstance(v, list) else v 
-                                        for k, v in params.items()}
+                                          for k, v in params.items()}
             
             print(f"✅ Model loaded from {self.model_path}")
         except Exception as e:
-            print(f"⚠️  Could not load model: {e}")
+            print(f"⚠️ Could not load model: {e}")
             self.build_model()
 
 

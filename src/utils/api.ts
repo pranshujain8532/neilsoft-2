@@ -210,10 +210,74 @@ export const storageAPI = {
         if (error) throw error;
         return { data };
     },
-    getAlerts: async () => {
-        // Fetch alerts from containers or a separate alerts table if created
-        // For now, we can return empty or fetch containers with critical status
-        const { data, error } = await supabase.from('containers').select('*').in('status', ['warning', 'critical']);
+    getAlerts: async (status?: string) => {
+        let query = supabase.from('storage_alerts').select('*').order('detected_at', { ascending: false });
+        if (status) {
+            query = query.eq('status', status);
+        }
+        const { data, error } = await query;
+        if (error) throw error;
+        return { data };
+    },
+    acknowledgeAlert: async (id: string, userId?: string) => {
+        const { data, error } = await supabase
+            .from('storage_alerts')
+            .update({
+                status: 'acknowledged',
+                acknowledged_at: new Date().toISOString(),
+                acknowledged_by: userId
+            })
+            .eq('id', id);
+        if (error) throw error;
+        return { data };
+    },
+    resolveAlert: async (id: string, userId?: string, notes?: string) => {
+        const { data, error } = await supabase
+            .from('storage_alerts')
+            .update({
+                status: 'resolved',
+                resolved_at: new Date().toISOString(),
+                resolved_by: userId,
+                resolution_notes: notes
+            })
+            .eq('id', id);
+        if (error) throw error;
+        return { data };
+    },
+    getSensorReadings: async (containerId: string, limit: number = 100) => {
+        const { data, error } = await supabase
+            .from('storage_sensor_readings')
+            .select('*')
+            .eq('container_id', containerId)
+            .order('timestamp', { ascending: false })
+            .limit(limit);
+        if (error) throw error;
+        return { data };
+    },
+    getTransactions: async (containerId: string, limit: number = 50) => {
+        const { data, error } = await supabase
+            .from('storage_transactions')
+            .select('*')
+            .eq('container_id', containerId)
+            .order('transaction_date', { ascending: false })
+            .limit(limit);
+        if (error) throw error;
+        return { data };
+    },
+    createTransaction: async (transaction: {
+        container_id: string;
+        transaction_type: 'inflow' | 'outflow';
+        volume_kg: number;
+        source_destination?: string;
+        hydrogen_purity_percent?: number;
+        order_id?: string;
+        notes?: string;
+    }) => {
+        const { data, error } = await supabase
+            .from('storage_transactions')
+            .insert(transaction)
+            .select()
+            .single();
         if (error) throw error;
         return { data };
     },
@@ -322,4 +386,49 @@ export const mlAPI = {
     forecastEnergy: (data: any) => mlApi.post('/forecast/energy', data),
 };
 
+// Storage ML API - connects to ML backend for storage predictions
+export const storageMLAPI = {
+    // Get status of all storage ML models
+    getStatus: () => mlApi.get('/storage/status'),
+
+    // Get all latest ML predictions
+    getPredictions: () => mlApi.get('/storage/predictions'),
+
+    // Run anomaly detection on a container
+    detectAnomaly: (containerId: string) =>
+        mlApi.post('/storage/anomaly/detect', { container_id: containerId }),
+
+    // Predict container health
+    predictHealth: (containerId: string) =>
+        mlApi.post('/storage/health/predict', { container_id: containerId }),
+
+    // Get demand forecast
+    getDemandForecast: (containerId?: string) =>
+        mlApi.get('/storage/demand/forecast', { params: { container_id: containerId } }),
+
+    // Get inventory optimization recommendation
+    getInventoryRecommendation: (containerData?: any) =>
+        containerData
+            ? mlApi.post('/storage/inventory/optimize', containerData)
+            : mlApi.get('/storage/inventory/optimize'),
+
+    // Get comprehensive ML analysis for a container
+    getContainerAnalysis: (containerId: string) =>
+        mlApi.get(`/storage/containers/${containerId}/analysis`),
+
+    // Generate AI-enhanced alert with recommendations
+    generateAIAlert: (containerId: string, alertType?: string) =>
+        mlApi.post('/storage/alerts/ai', { container_id: containerId, alert_type: alertType }),
+
+    // Train all storage ML models (admin only)
+    trainModels: () => mlApi.post('/storage/train'),
+
+    // Start storage ML background service
+    startService: () => mlApi.post('/storage/service/start'),
+
+    // Stop storage ML background service
+    stopService: () => mlApi.post('/storage/service/stop'),
+};
+
 export default api;
+

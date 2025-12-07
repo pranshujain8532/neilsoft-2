@@ -20,7 +20,8 @@ const MaintenanceCalendar: React.FC = () => {
 
     const fetchSchedule = async () => {
         try {
-            const response = await fetch('http://localhost:5000/api/maintenance/schedule');
+            // Fetch from ML service maintenance calendar endpoint
+            const response = await fetch('http://localhost:5001/maintenance/calendar');
             const data = await response.json();
             if (data.schedule) {
                 setEvents(data.schedule);
