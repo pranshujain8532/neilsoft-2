@@ -1,4 +1,4 @@
-"""
+﻿"""
 Energy Production Forecasting Models
 Predicts solar, wind, and hydro energy output based on weather conditions
 """
@@ -52,7 +52,7 @@ class EnergyForecaster:
         for model in [self.solar_model, self.wind_model, self.hydro_model]:
             model.compile(optimizer='adam', loss='mse', metrics=['mae'])
         
-        print("✅ Energy forecasting models built")
+        print("[OK] Energy forecasting models built")
     
     def generate_training_data_solar(self, num_samples=1000):
         """Generate solar training data using real historical weather"""
@@ -181,7 +181,7 @@ class EnergyForecaster:
     def train_all(self, epochs=50):
         """Train all forecasting models with accuracy tracking"""
         if not HAS_TF:
-            print("⚠️  TensorFlow not available")
+            print("[WARN]  TensorFlow not available")
             return
         
         results = {}
@@ -196,7 +196,7 @@ class EnergyForecaster:
         )
         solar_mae = min(history_solar.history['val_mae'])
         solar_acc = max(0, 100 - (solar_mae / (y_solar.mean() + 0.001) * 100))
-        print(f"   ✅ Solar MAE: {solar_mae:.3f}, Accuracy: {solar_acc:.1f}%")
+        print(f"   [OK] Solar MAE: {solar_mae:.3f}, Accuracy: {solar_acc:.1f}%")
         results['solar'] = solar_acc
         
         print("🔄 Training Wind Forecaster...")
@@ -209,7 +209,7 @@ class EnergyForecaster:
         )
         wind_mae = min(history_wind.history['val_mae'])
         wind_acc = max(0, 100 - (wind_mae / (y_wind.mean() + 0.001) * 100))
-        print(f"   ✅ Wind MAE: {wind_mae:.3f}, Accuracy: {wind_acc:.1f}%")
+        print(f"   [OK] Wind MAE: {wind_mae:.3f}, Accuracy: {wind_acc:.1f}%")
         results['wind'] = wind_acc
         
         print("🔄 Training Hydro Forecaster...")
@@ -222,17 +222,17 @@ class EnergyForecaster:
         )
         hydro_mae = min(history_hydro.history['val_mae'])
         hydro_acc = max(0, 100 - (hydro_mae / (y_hydro.mean() + 0.001) * 100))
-        print(f"   ✅ Hydro MAE: {hydro_mae:.3f}, Accuracy: {hydro_acc:.1f}%")
+        print(f"   [OK] Hydro MAE: {hydro_mae:.3f}, Accuracy: {hydro_acc:.1f}%")
         results['hydro'] = hydro_acc
         
         avg_acc = (solar_acc + wind_acc + hydro_acc) / 3
-        print(f"\n📊 Energy Forecasters Training Complete!")
+        print(f"\n[DATA] Energy Forecasters Training Complete!")
         print(f"   Average Accuracy: {avg_acc:.1f}%")
         
         if avg_acc >= 80:
             print(f"   🎯 Target accuracy achieved!")
         else:
-            print(f"   ⚠️  Consider additional training")
+            print(f"   [WARN]  Consider additional training")
         
         return results
     

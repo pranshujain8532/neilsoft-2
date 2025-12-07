@@ -1,4 +1,4 @@
-"""
+﻿"""
 Test script for Storage ML models
 Tests all 4 models: Anomaly Detector, Health Predictor, Demand Forecaster, Inventory Optimizer
 """
@@ -78,11 +78,11 @@ def test_anomaly_detector():
         print(f"      Anomaly Score: {result_anomaly['anomaly_score']:.3f}")
         print(f"      Anomalous Sensors: {result_anomaly.get('anomalous_sensors', [])}")
         
-        print("   ✅ Anomaly Detector test passed")
+        print("   [OK] Anomaly Detector test passed")
         return True
         
     except Exception as e:
-        print(f"   ❌ Error: {e}")
+        print(f"   [ERROR] Error: {e}")
         return False
 
 
@@ -136,11 +136,11 @@ def test_health_predictor():
         print(f"      Maintenance Prob: {result_degraded['maintenance_probability']:.1f}%")
         print(f"      Next Inspection: {result_degraded.get('next_inspection_recommended', 'N/A')}")
         
-        print("   ✅ Health Predictor test passed")
+        print("   [OK] Health Predictor test passed")
         return True
         
     except Exception as e:
-        print(f"   ❌ Error: {e}")
+        print(f"   [ERROR] Error: {e}")
         return False
 
 
@@ -170,11 +170,11 @@ def test_demand_forecaster():
         print(f"      Confidence: {result['confidence']:.2f}")
         print(f"      Model Type: {result['model_type']}")
         
-        print("   ✅ Demand Forecaster test passed")
+        print("   [OK] Demand Forecaster test passed")
         return True
         
     except Exception as e:
-        print(f"   ❌ Error: {e}")
+        print(f"   [ERROR] Error: {e}")
         return False
 
 
@@ -206,11 +206,11 @@ def test_inventory_optimizer():
             print(f"      Action: {result['action_name']}")
             print(f"      Confidence: {result['confidence']:.2f}")
         
-        print("   ✅ Inventory Optimizer test passed")
+        print("   [OK] Inventory Optimizer test passed")
         return True
         
     except Exception as e:
-        print(f"   ❌ Error: {e}")
+        print(f"   [ERROR] Error: {e}")
         return False
 
 
@@ -235,11 +235,11 @@ def test_storage_ml_service():
         print(f"      Forecast: {'available' if predictions['forecast'] else 'pending'}")
         print(f"      Optimization: {'available' if predictions['optimization'] else 'pending'}")
         
-        print("   ✅ Storage ML Service test passed")
+        print("   [OK] Storage ML Service test passed")
         return True
         
     except Exception as e:
-        print(f"   ❌ Error: {e}")
+        print(f"   [ERROR] Error: {e}")
         return False
 
 
@@ -255,14 +255,14 @@ def run_all_tests():
     
     print()
     print("=" * 70)
-    print("📊 Test Summary")
+    print("[DATA] Test Summary")
     print("=" * 70)
     
     passed = sum(1 for v in results.values() if v)
     total = len(results)
     
     for name, result in results.items():
-        status = "✅ PASS" if result else "❌ FAIL"
+        status = "[OK] PASS" if result else "[ERROR] FAIL"
         print(f"   {name}: {status}")
     
     print()
@@ -271,7 +271,7 @@ def run_all_tests():
     if passed == total:
         print("   🎉 All tests passed!")
     else:
-        print("   ⚠️  Some tests failed. Check logs above.")
+        print("   [WARN]  Some tests failed. Check logs above.")
     
     return passed == total
 

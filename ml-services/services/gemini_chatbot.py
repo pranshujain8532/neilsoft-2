@@ -1,4 +1,4 @@
-"""
+﻿"""
 Gemini AI Chatbot Service
 Provides intelligent responses using Google's Gemini 2.0 Flash model.
 ENHANCED: Now fetches real-time data from Supabase for orders and plants.
@@ -28,9 +28,9 @@ class GeminiChatbot:
         if supabase_url and supabase_key:
             try:
                 self.supabase = create_client(supabase_url, supabase_key)
-                print("✅ Supabase connected for chatbot (using service role key)")
+                print("[OK] Supabase connected for chatbot (using service role key)")
             except Exception as e:
-                print(f"⚠️  Supabase connection failed: {e}")
+                print(f"[WARN] Supabase connection failed: {e}")
         
         self.enabled = False
         
@@ -55,11 +55,11 @@ class GeminiChatbot:
                 genai.configure(api_key=self.api_key)
                 self.model = genai.GenerativeModel(self.model_name)
                 self.enabled = True
-                print(f"✅ Gemini API initialized with model: {self.model_name}")
+                print(f"[OK] Gemini API initialized with model: {self.model_name}")
             except Exception as e:
-                print(f"⚠️  Failed to initialize Gemini: {e}")
+                print(f"[WARN] Failed to initialize Gemini: {e}")
         else:
-            print("⚠️  Gemini API key not configured, using fallback responses")
+            print("[WARN] Gemini API key not configured, using fallback responses")
 
     def _fetch_plants_data(self) -> str:
         """Fetch real plant data from Supabase"""
@@ -85,14 +85,14 @@ class GeminiChatbot:
 
     def _fetch_user_orders(self, user_id: str) -> str:
         """Fetch order history for a specific user from Supabase"""
-        print(f"🔍 Fetching orders for user_id: {user_id}")
+        print(f"[INFO] Fetching orders for user_id: {user_id}")
         
         if not self.supabase:
-            print("   ❌ Supabase not connected")
+            print("   [ERROR] Supabase not connected")
             return "Order history unavailable - database not connected."
         
         if not user_id:
-            print("   ❌ No user_id provided")
+            print("   [ERROR] No user_id provided")
             return "Please log in to view your order history."
         
         try:
@@ -105,17 +105,17 @@ class GeminiChatbot:
             
             # If no orders with customer_id, try user_id
             if not orders:
-                print("   ⚠️ No orders with customer_id, trying user_id...")
+                print("   [WARN] No orders with customer_id, trying user_id...")
                 response = self.supabase.table('orders').select(
                     'id, status, quantity, total_price, created_at, delivery_address, transport_method'
                 ).eq('user_id', user_id).order('created_at', desc=True).limit(10).execute()
                 orders = response.data
             
             if not orders:
-                print("   ⚠️ No orders found for this user")
+                print("   [WARN] No orders found for this user")
                 return "You don't have any orders yet. Visit our Shop to place your first order!"
             
-            print(f"   ✅ Found {len(orders)} orders")
+            print(f"   [OK] Found {len(orders)} orders")
             order_info = f"Here are your recent orders:\n\n"
             for o in orders:
                 order_info += f"• Order #{o['id'][:8]}: {o.get('quantity', 'N/A')}kg Green Hydrogen\n"
@@ -129,7 +129,7 @@ class GeminiChatbot:
             
             return order_info
         except Exception as e:
-            print(f"   ❌ Error fetching orders: {e}")
+            print(f"   [ERROR] Error fetching orders: {e}")
             return f"Unable to fetch order history: {str(e)}"
 
     def _fetch_all_recent_orders(self) -> str:
@@ -214,7 +214,7 @@ class GeminiChatbot:
             return response.text
             
         except Exception as e:
-            print(f"❌ Error getting Gemini response: {e}")
+            print(f"[ERROR] Error getting Gemini response: {e}")
             import traceback
             traceback.print_exc()
             return self._get_fallback_response(message, user_id)

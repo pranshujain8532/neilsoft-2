@@ -1,4 +1,4 @@
-import numpy as np
+﻿import numpy as np
 import requests
 import json
 import os
@@ -20,7 +20,7 @@ try:
     HAS_TF = True
 except ImportError:
     HAS_TF = False
-    print("⚠️ TensorFlow not found. Using fallback logic.")
+    print("[WARN] TensorFlow not found. Using fallback logic.")
 
 class EnergyMLService:
     def __init__(self):
@@ -184,7 +184,7 @@ class EnergyMLService:
             
             return curr, tomorrow_w
         except Exception as e:
-            print(f"❌ Weather API Error: {e}")
+            print(f"[ERROR] Weather API Error: {e}")
             return None, None
 
     def run_daily_cycle(self):

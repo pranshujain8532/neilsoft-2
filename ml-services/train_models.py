@@ -1,4 +1,4 @@
-"""
+﻿"""
 ML Model Training Script
 Train all AI/ML models for the Green Hydrogen Platform
 """
@@ -15,7 +15,7 @@ from models.energy_forecaster import energy_forecaster
 
 def main():
     print("=" * 70)
-    print("🚀 Green Hydrogen ML Model Training Pipeline")
+    print("[START] Green Hydrogen ML Model Training Pipeline")
     print("=" * 70)
     print()
     print("📋 Training Configuration:")
@@ -36,9 +36,9 @@ def main():
     try:
         history, accuracy = profit_predictor.train(epochs=100, batch_size=32)
         results['profit_predictor'] = accuracy
-        print(f"✅ Profit Predictor: {accuracy:.1f}% accuracy")
+        print(f"[OK] Profit Predictor: {accuracy:.1f}% accuracy")
     except Exception as e:
-        print(f"⚠️  Profit Predictor training skipped: {e}")
+        print(f"[WARN]  Profit Predictor training skipped: {e}")
         results['profit_predictor'] = 0
     
     # Train Safety Monitor (Physics-Informed NN)
@@ -48,9 +48,9 @@ def main():
     try:
         history, accuracy = safety_monitor.train(epochs=80, batch_size=32)
         results['safety_monitor'] = accuracy
-        print(f"✅ Safety Monitor: {accuracy:.1f}% accuracy")
+        print(f"[OK] Safety Monitor: {accuracy:.1f}% accuracy")
     except Exception as e:
-        print(f"⚠️  Safety Monitor training skipped: {e}")
+        print(f"[WARN]  Safety Monitor training skipped: {e}")
         results['safety_monitor'] = 0
     
     # Train Energy Forecasters
@@ -61,19 +61,19 @@ def main():
         forecaster_results = energy_forecaster.train_all(epochs=50)
         avg_forecaster_acc = sum(forecaster_results.values()) / len(forecaster_results)
         results['energy_forecasters'] = avg_forecaster_acc
-        print(f"✅ Energy Forecasters: {avg_forecaster_acc:.1f}% average accuracy")
+        print(f"[OK] Energy Forecasters: {avg_forecaster_acc:.1f}% average accuracy")
     except Exception as e:
-        print(f"⚠️  Energy Forecasters training skipped: {e}")
+        print(f"[WARN]  Energy Forecasters training skipped: {e}")
         results['energy_forecasters'] = 0
     
     # Summary
     print("\n" + "=" * 70)
     print("🎉 Training Complete!")
     print("=" * 70)
-    print("\n📊 Model Performance Summary:")
+    print("\n[DATA] Model Performance Summary:")
     print("-" * 70)
     for model_name, acc in results.items():
-        status = "✅" if  acc >= 80 else "⚠️ "
+        status = "[OK]" if  acc >= 80 else "[WARN] "
         print(f"   {status} {model_name.replace('_', ' ').title()}: {acc:.1f}%")
     
     avg_accuracy = sum(results.values()) / len(results) if results else 0
@@ -86,7 +86,7 @@ def main():
         print(f"   📈 Some models need improvement")
     
     print("\n💾 Models saved to: ./models/saved/")
-    print("\n🚀 To use the models, start the ML service:")
+    print("\n[START] To use the models, start the ML service:")
     print("   python app.py")
     print()
 

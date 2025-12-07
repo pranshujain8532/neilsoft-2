@@ -1,4 +1,4 @@
-"""
+﻿"""
 HYBRID Plant Recommendation System
 Logic: 
 1. Geocode Order Address
@@ -22,7 +22,7 @@ try:
     HAS_TF = True
 except ImportError:
     HAS_TF = False
-    print("⚠️ TensorFlow not available, using rule-based only")
+    print("[WARN] TensorFlow not available, using rule-based only")
 
 class HybridPlantRecommender:
     def __init__(self, supabase_url, supabase_key, google_maps_key, model_path='models/saved/plant_recommender_nn.h5'):
@@ -43,7 +43,7 @@ class HybridPlantRecommender:
         """Convert address to Lat/Lon using Google Maps API"""
         if not self.gmaps:
             # Fallback for testing if no API Key
-            print("⚠️ No Google Maps Key. Returning Default (Nagpur, India Center)")
+            print("[WARN] No Google Maps Key. Returning Default (Nagpur, India Center)")
             return 21.1458, 79.0882 
         
         try:
@@ -52,7 +52,7 @@ class HybridPlantRecommender:
                 loc = geocode_result[0]['geometry']['location']
                 return loc['lat'], loc['lng']
         except Exception as e:
-            print(f"⚠️ Geocoding error: {e}")
+            print(f"[WARN] Geocoding error: {e}")
         
         return 21.1458, 79.0882
 
@@ -115,7 +115,7 @@ class HybridPlantRecommender:
         plants = self.supabase.table('plants').select('*').execute().data
         
         if not orders:
-            print("   ✅ No pending orders.")
+            print("   [OK] No pending orders.")
             return
 
         for order in orders:
@@ -149,7 +149,7 @@ class HybridPlantRecommender:
                 is_viable = True
                 if dist_km > 500 and not has_pipeline:
                     is_viable = False
-                    print(f"   ❌ Skipping {plant['name']} (Dist: {int(dist_km)}km, No Pipeline)")
+                    print(f"   [ERROR] Skipping {plant['name']} (Dist: {int(dist_km)}km, No Pipeline)")
                 
                 if is_viable:
                     plant['calc_distance'] = dist_km
@@ -157,7 +157,7 @@ class HybridPlantRecommender:
 
             # Fallback: If ALL plants were skipped, bring them back (don't fail the order)
             if not valid_plants:
-                print("   ⚠️ No plants met strict criteria. Falling back to all plants.")
+                print("   [WARN] No plants met strict criteria. Falling back to all plants.")
                 for p in plants:
                     p['calc_distance'] = self.calculate_distance(float(p['latitude']), float(p['longitude']), o_lat, o_lon)
                     valid_plants.append(p)
@@ -211,7 +211,7 @@ class HybridPlantRecommender:
                 }
                 self.supabase.table('orders').update(update_payload).eq('id', order['id']).execute()
                 self.supabase.table('orders').update(update_payload).eq('id', order['id']).execute()
-                print(f"   ✅ ASSIGNED: {best_plant['name']} via {transport_method.upper()}")
+                print(f"   [OK] ASSIGNED: {best_plant['name']} via {transport_method.upper()}")
                 print(f"   📝 {explanation}")
 
     # --- SINGLE ORDER API ---
@@ -231,7 +231,7 @@ class HybridPlantRecommender:
         # 1. Fetch Plants
         plants = self.supabase.table('plants').select('*').eq('status', 'operational').execute().data
         if not plants:
-            print("   ❌ No operational plants found")
+            print("   [ERROR] No operational plants found")
             return None
 
         # 2. Geocode customer location
@@ -256,7 +256,7 @@ class HybridPlantRecommender:
         plants_under_500 = [p for p in plants_with_distance if p['calc_distance'] <= 500]
         plants_over_500 = [p for p in plants_with_distance if p['calc_distance'] > 500]
         
-        print(f"\n   📊 Distance Analysis:")
+        print(f"\n   [DATA] Distance Analysis:")
         print(f"      Plants ≤500km: {len(plants_under_500)}")
         print(f"      Plants >500km: {len(plants_over_500)}")
         
@@ -268,11 +268,11 @@ class HybridPlantRecommender:
         elif len(plants_over_500) == 0:
             # ALL plants are <= 500km -> Use all plants, trucks will work
             candidates = plants_with_distance
-            print(f"   ✅ All plants close (≤500km). Considering all for recommendation.")
+            print(f"   [OK] All plants close (≤500km). Considering all for recommendation.")
         else:
             # MIXED -> Filter to only plants under 500km (prefer truck routes)
             candidates = plants_under_500
-            print(f"   🔍 Mixed distances. Filtering to {len(plants_under_500)} close plants.")
+            print(f"   [INFO] Mixed distances. Filtering to {len(plants_under_500)} close plants.")
 
         # 6. Score candidates using recommendation system
         best_plant = None
@@ -291,7 +291,7 @@ class HybridPlantRecommender:
                 best_contribs = contribs
 
         if not best_plant:
-            print("   ❌ No plant could be selected")
+            print("   [ERROR] No plant could be selected")
             return None
 
         # 7. Determine transport method based on selected plant's distance
@@ -319,7 +319,7 @@ class HybridPlantRecommender:
         elif best_plant.get('lcoh', 0) > 2.0:
             explanation += " Prioritized availability over cost."
 
-        print(f"   ✅ SELECTED: {best_plant['name']} (Score: {best_score:.3f}) via {transport_method.upper()}")
+        print(f"   [OK] SELECTED: {best_plant['name']} (Score: {best_score:.3f}) via {transport_method.upper()}")
 
         return {
             'plant': best_plant,

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Per-Plant ML Service
 Runs ML models separately for each plant with location-specific weather
 Dynamic Plant Loading from Supabase
@@ -26,9 +26,9 @@ class PerPlantMLService:
         try:
             if os.path.exists(self.model_path):
                 self.model = joblib.load(self.model_path)
-                print("✅ PerPlantMLService: Loaded ML model")
+                print("[OK] PerPlantMLService: Loaded ML model")
         except Exception as e:
-            print(f"⚠️ PerPlantMLService: Could not load model: {e}")
+            print(f"[WARN] PerPlantMLService: Could not load model: {e}")
             
         # Initialize Supabase client
         self.supabase = self._init_supabase()
@@ -53,14 +53,14 @@ class PerPlantMLService:
             key = os.environ.get('SUPABASE_SERVICE_ROLE_KEY') or os.environ.get('SUPABASE_KEY') or os.environ.get('VITE_SUPABASE_ANON_KEY')
             
             if not url or not key:
-                print(f"⚠️ Missing Supabase credentials")
+                print(f"[WARN] Missing Supabase credentials")
                 return None
             
             client = create_client(url, key)
-            print("✅ PerPlantMLService: Connected to Supabase")
+            print("[OK] PerPlantMLService: Connected to Supabase")
             return client
         except Exception as e:
-            print(f"⚠️ Could not initialize Supabase: {e}")
+            print(f"[WARN] Could not initialize Supabase: {e}")
             return None
 
     def _map_db_row_to_config(self, row: Dict) -> Dict:
@@ -134,7 +134,7 @@ class PerPlantMLService:
     def _fetch_plant_from_db(self, plant_id: str) -> Optional[Dict]:
         """Fetch a specific plant configuration from Supabase"""
         if not self.supabase:
-            print("⚠️ DB not connected, cannot fetch plant.")
+            print("[WARN] DB not connected, cannot fetch plant.")
             return None
             
         try:
@@ -144,10 +144,10 @@ class PerPlantMLService:
             if response.data and len(response.data) > 0:
                 return self._map_db_row_to_config(response.data[0])
             
-            print(f"⚠️ Plant ID {plant_id} not found in database.")
+            print(f"[WARN] Plant ID {plant_id} not found in database.")
             return None
         except Exception as e:
-            print(f"⚠️ Error fetching plant {plant_id}: {e}")
+            print(f"[WARN] Error fetching plant {plant_id}: {e}")
             return None
 
     def _fetch_all_plants_from_db(self) -> List[Dict]:
@@ -159,11 +159,11 @@ class PerPlantMLService:
             response = self.supabase.table('plants').select('*').execute()
             if response.data:
                 plants = [self._map_db_row_to_config(row) for row in response.data]
-                print(f"✅ Fetched {len(plants)} plants from database")
+                print(f"[OK] Fetched {len(plants)} plants from database")
                 return plants
             return []
         except Exception as e:
-            print(f"⚠️ Error fetching all plants: {e}")
+            print(f"[WARN] Error fetching all plants: {e}")
             return []
 
     def fetch_real_time_oxygen_price(self) -> float:
@@ -181,14 +181,14 @@ class PerPlantMLService:
                     if observations:
                         latest_index = float(observations[0]['value'])
                         calibrated_price = (latest_index / 350.0) * 0.20
-                        print(f"✅ Fetched Oxygen PPI Index: {latest_index} -> Calculated Price: ${calibrated_price:.4f}/kg")
+                        print(f"[OK] Fetched Oxygen PPI Index: {latest_index} -> Calculated Price: ${calibrated_price:.4f}/kg")
                         return calibrated_price
             
             print("ℹ️ Using researched baseline for Oxygen Price")
             return 0.15 
             
         except Exception as e:
-            print(f"⚠️ Error fetching Oxygen price: {e}")
+            print(f"[WARN] Error fetching Oxygen price: {e}")
             return 0.15
             
     def calculate_energy_production(self, plant_config: Dict, weather: Dict) -> Dict:

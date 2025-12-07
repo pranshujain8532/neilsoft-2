@@ -1,4 +1,4 @@
-from supabase import create_client
+﻿from supabase import create_client
 import os
 from dotenv import load_dotenv
 import json

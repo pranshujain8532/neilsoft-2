@@ -1,4 +1,4 @@
-"""
+﻿"""
 Advanced Energy Optimization Service
 Uses 40+ parameters including thermodynamics, physics, and market data
 to optimize energy source selection.

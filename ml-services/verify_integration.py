@@ -1,4 +1,4 @@
-"""
+﻿"""
 Integration Test for Per-Plant ML Service
 Tests FRED API integration and Supabase data fetching
 """
@@ -24,22 +24,22 @@ async def test_integrated_service():
         all_plants = per_plant_ml_service._fetch_all_plants_from_db()
         
         if not all_plants:
-            print("⚠️ No plants found in database. Make sure plants table has data.")
+            print("[WARN] No plants found in database. Make sure plants table has data.")
             print("   Creating test with first available plant or returning early...")
             return False
         
-        print(f"✅ Found {len(all_plants)} plants in database:")
+        print(f"[OK] Found {len(all_plants)} plants in database:")
         for plant in all_plants:
             print(f"   - {plant['name']} ({plant['id'][:8]}...) @ {plant['location']}")
         
         # Test 2: Get predictions for first plant
         first_plant_id = all_plants[0]['id']
-        print(f"\n📊 Test 2: Fetching predictions for plant: {all_plants[0]['name']}...")
+        print(f"\n[DATA] Test 2: Fetching predictions for plant: {all_plants[0]['name']}...")
         
         result = await per_plant_ml_service.get_plant_predictions(first_plant_id)
         
         if result:
-            print("\n✅ Prediction Result:")
+            print("\n[OK] Prediction Result:")
             print(f"   Plant: {result.get('plant_name')}")
             print(f"   Location: {result.get('location')}")
             print(f"   LCOH: ${result.get('lcoh')}/kg")
@@ -77,7 +77,7 @@ async def test_integrated_service():
                 print(f"   - Savings Generated: ${oxygen_data.get('savings_generated', 'N/A')}")
                 
                 if oxygen_data.get('price_per_kg', 0) > 0:
-                    print("\n✅ Oxygen price fetched successfully!")
+                    print("\n[OK] Oxygen price fetched successfully!")
             
             # Safety status
             safety = result.get('safety_status', {})
@@ -86,14 +86,14 @@ async def test_integrated_service():
             print(f"   - Anomaly Score: {safety.get('anomaly_score', 'N/A')}")
             
             print("\n" + "=" * 70)
-            print("✅ All tests passed!")
+            print("[OK] All tests passed!")
             return True
         else:
-            print("\n❌ Error: Service returned None")
+            print("\n[ERROR] Error: Service returned None")
             return False
             
     except Exception as e:
-        print(f"\n❌ Error during service execution: {e}")
+        print(f"\n[ERROR] Error during service execution: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -108,10 +108,10 @@ async def test_all_plants():
         results = await per_plant_ml_service.get_all_plants_predictions()
         
         if not results:
-            print("⚠️ No prediction results returned")
+            print("[WARN] No prediction results returned")
             return False
         
-        print(f"\n✅ Successfully generated predictions for {len(results)} plants:\n")
+        print(f"\n[OK] Successfully generated predictions for {len(results)} plants:\n")
         
         for result in results:
             profit = result.get('profit_prediction', {})
@@ -124,7 +124,7 @@ async def test_all_plants():
         return True
         
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"[ERROR] Error: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -149,7 +149,7 @@ if __name__ == "__main__":
     if success1 and success2:
         print("🎉 ALL INTEGRATION TESTS PASSED!")
     else:
-        print("⚠️ Some tests failed. Check output above.")
+        print("[WARN] Some tests failed. Check output above.")
     print("=" * 70 + "\n")
     
     sys.exit(0 if (success1 and success2) else 1)

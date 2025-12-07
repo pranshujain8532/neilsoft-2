@@ -1,4 +1,4 @@
-"""
+﻿"""
 Storage Health Predictor using Physics-Informed Neural Network
 Predicts container health scores and maintenance probability based on thermodynamic parameters
 """
@@ -17,7 +17,7 @@ try:
     HAS_TF = True
 except ImportError:
     HAS_TF = False
-    print("⚠️ TensorFlow not available for StorageHealthPredictor")
+    print("[WARN] TensorFlow not available for StorageHealthPredictor")
 
 try:
     from supabase import create_client, Client
@@ -121,7 +121,7 @@ class StorageHealthPredictor:
             }
         )
         
-        print("✅ Storage Health Predictor NN built")
+        print("[OK] Storage Health Predictor NN built")
         print(f"   Input features: {self.n_features}")
         print(f"   Outputs: health_score, maintenance_probability")
     
@@ -270,11 +270,11 @@ class StorageHealthPredictor:
                 y_health.append(health)
                 y_maintenance.append(int(maintenance > 0.5))
             
-            print(f"✅ Fetched {len(X)} containers from Supabase")
+            print(f"[OK] Fetched {len(X)} containers from Supabase")
             return np.array(X), np.array(y_health), np.array(y_maintenance)
             
         except Exception as e:
-            print(f"❌ Error fetching training data: {e}")
+            print(f"[ERROR] Error fetching training data: {e}")
             return None
     
     def normalize_data(self, X: np.ndarray, fit: bool = False) -> np.ndarray:
@@ -296,7 +296,7 @@ class StorageHealthPredictor:
     def train(self, epochs: int = 100, batch_size: int = 32) -> Dict:
         """Train the health prediction model"""
         if not HAS_TF:
-            print("⚠️ TensorFlow not available")
+            print("[WARN] TensorFlow not available")
             return {'success': False, 'error': 'TensorFlow not available'}
         
         print("🔄 Training Storage Health Predictor...")
@@ -347,7 +347,7 @@ class StorageHealthPredictor:
         val_health_mae = min(history.history['val_health_score_mae'])
         val_maint_acc = max(history.history['val_maintenance_prob_accuracy'])
         
-        print(f"\n✅ Training completed!")
+        print(f"\n[OK] Training completed!")
         print(f"   Health MAE: {val_health_mae:.4f}")
         print(f"   Maintenance Accuracy: {val_maint_acc * 100:.1f}%")
         
@@ -473,7 +473,7 @@ class StorageHealthPredictor:
         recommendations = []
         
         if health < 70:
-            recommendations.append("⚠️ Schedule maintenance inspection within 2 weeks")
+            recommendations.append("[WARN] Schedule maintenance inspection within 2 weeks")
         
         if pressure > 380:
             recommendations.append("🔴 Reduce system pressure - currently above optimal range")
@@ -493,10 +493,10 @@ class StorageHealthPredictor:
             recommendations.append("📋 Overdue for inspection - schedule immediately")
         
         if maintenance_prob > 0.6:
-            recommendations.append("🔧 High maintenance probability - prepare maintenance team")
+            recommendations.append("[FIX] High maintenance probability - prepare maintenance team")
         
         if not recommendations:
-            recommendations.append("✅ Container operating within optimal parameters")
+            recommendations.append("[OK] Container operating within optimal parameters")
         
         return recommendations
     
@@ -559,10 +559,10 @@ class StorageHealthPredictor:
                             'std': np.array(params['std'])
                         }
             
-            print(f"✅ Health predictor loaded from {self.model_path}")
+            print(f"[OK] Health predictor loaded from {self.model_path}")
             
         except Exception as e:
-            print(f"⚠️ Could not load model: {e}")
+            print(f"[WARN] Could not load model: {e}")
             self.build_model()
 
 

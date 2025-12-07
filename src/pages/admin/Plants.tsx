@@ -101,10 +101,14 @@ const Plants = () => {
         setMlPrediction(null);
 
         try {
-            // Fetch production history
-            const historyRes = await productionHistoryAPI.getByPlant(plant.id, 20);
+            // Fetch production history - only show records with actual production
+            const historyRes = await productionHistoryAPI.getByPlant(plant.id, 50);
             if (historyRes.data) {
-                setPlantHistory(historyRes.data);
+                // Filter out records with 0 or null production
+                const validRecords = historyRes.data.filter((r: ProductionRecord) =>
+                    r.production_kg && r.production_kg > 0
+                );
+                setPlantHistory(validRecords.slice(0, 20));
             }
 
             // Fetch REAL weather for plant location
@@ -552,9 +556,6 @@ const Plants = () => {
                                                                 <div>
                                                                     <p className="text-white text-sm font-medium">
                                                                         {new Date(record.timestamp).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                                                                    </p>
-                                                                    <p className="text-gray-500 text-xs">
-                                                                        {record.energy_generated_mw?.toFixed(2) || 0} MW Generated
                                                                     </p>
                                                                 </div>
                                                             </div>

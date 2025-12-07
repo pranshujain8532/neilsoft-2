@@ -1,4 +1,4 @@
-"""
+﻿"""
 Physics-Informed Neural Network for Safety Monitoring
 Monitors pressure, temperature, flow rates with physics constraints
 """
@@ -60,7 +60,7 @@ class SafetyMonitor:
             metrics={'safety_score': 'mae', 'anomaly': 'accuracy'}
         )
         
-        print("✅ Physics-Informed Safety Monitor built  successfully")
+        print("[OK] Physics-Informed Safety Monitor built  successfully")
     
     def generate_training_data(self, num_samples=2000):
         """Generate synthetic training data with physics constraints"""
@@ -101,13 +101,13 @@ class SafetyMonitor:
     def train(self, epochs=80, batch_size=32):
         """Train the safety model with accuracy tracking"""
         if not HAS_TF:
-            print("⚠️  TensorFlow not available")
+            print("[WARN]  TensorFlow not available")
             return
         
         print("🔄 Generating enhanced safety training data...")
         X, y_safety, y_anomaly = self.generate_training_data(num_samples=3000)  # Larger dataset
         
-        print(f"📊 Training data: {X.shape[0]} samples")
+        print(f"[DATA] Training data: {X.shape[0]} samples")
         print("🎓 Training Physics-Informed Safety Monitor...")
         print(f"   Target: 80%+ anomaly detection accuracy")
         
@@ -132,14 +132,14 @@ class SafetyMonitor:
         val_accuracy = max(history.history['val_anomaly_accuracy']) * 100
         val_loss = min(history.history['val_loss'])
         
-        print(f"\n✅ Safety model training completed!")
+        print(f"\n[OK] Safety model training completed!")
         print(f"   Validation Anomaly Accuracy: {val_accuracy:.1f}%")
         print(f"   Validation Loss: {val_loss:.4f}")
         
         if val_accuracy >= 80:
             print(f"   🎯 Target accuracy achieved!")
         else:
-            print(f"   ⚠️  Accuracy: {val_accuracy:.1f}%, consider retraining")
+            print(f"   [WARN]  Accuracy: {val_accuracy:.1f}%, consider retraining")
         
         self.save_model()
         return history, val_accuracy
@@ -202,7 +202,7 @@ class SafetyMonitor:
         if level == 'CRITICAL':
             recs.append("🚨 IMMEDIATE ACTION REQUIRED! Initiate emergency shutdown protocol.")
         elif level == 'WARNING':
-            recs.append("⚠️  Reduce operational load and monitor closely.")
+            recs.append("[WARN]  Reduce operational load and monitor closely.")
         
         for alert in alerts:
             if 'PRESSURE' in alert:
@@ -232,9 +232,9 @@ class SafetyMonitor:
         
         try:
             self.model = keras.models.load_model(self.model_path)
-            print(f"✅ Safety model loaded from {self.model_path}")
+            print(f"[OK] Safety model loaded from {self.model_path}")
         except Exception as e:
-            print(f"⚠️  Could not load model: {e}")
+            print(f"[WARN]  Could not load model: {e}")
             self.build_model()
 
 

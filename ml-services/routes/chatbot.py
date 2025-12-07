@@ -1,4 +1,4 @@
-"""
+﻿"""
 Chatbot endpoint using Gemini AI with Supabase integration
 """
 

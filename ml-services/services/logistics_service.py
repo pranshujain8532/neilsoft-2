@@ -1,4 +1,4 @@
-import threading
+﻿import threading
 import time
 import os
 import requests
@@ -30,7 +30,7 @@ class LogisticsService:
             self.running = True
             self.update_thread = threading.Thread(target=self._update_loop, daemon=True)
             self.update_thread.start()
-            print("✅ Logistics service started")
+            print("[OK] Logistics service started")
 
     def stop(self):
         """Stop background updates"""
@@ -114,7 +114,7 @@ class LogisticsService:
     def optimize_order_fulfillment(self, order_details):
         """Select best plant for order using HYBRID ML recommender"""
         try:
-            print(f"🔍 Optimizing Order: {order_details.get('id')}")
+            print(f"[INFO] Optimizing Order: {order_details.get('id')}")
 
             # Import the HYBRID plant recommender
             from models.plant_recommender import HybridPlantRecommender
@@ -129,14 +129,14 @@ class LogisticsService:
             recommendation = engine.recommend_for_order(order_details)
             
             if not recommendation:
-                print("⚠️ No suitable plant found via AI Recommender")
+                print("[WARN] No suitable plant found via AI Recommender")
                 return None
                 
             selected_plant = recommendation['plant']
             transport_method = recommendation['transport_method']
             explanation = recommendation['explanation']
             
-            print(f"✅ AI Selected: {selected_plant['name']} ({transport_method})")
+            print(f"[OK] AI Selected: {selected_plant['name']} ({transport_method})")
             
             selected_vehicle = None
             
@@ -174,7 +174,7 @@ class LogisticsService:
                     # Update Order
                     supabase.table('orders').update({'status': 'in-transit'}).eq('id', order_details['id']).execute()
                 else:
-                    print("   ⚠️ No idle vehicles available for truck transport")
+                    print("   [WARN] No idle vehicles available for truck transport")
                     raise Exception("No idle vehicles available for truck transport")
 
             return {
@@ -186,7 +186,7 @@ class LogisticsService:
             }
 
         except Exception as e:
-            print(f"❌ Error optimizing order: {e}")
+            print(f"[ERROR] Error optimizing order: {e}")
             import traceback
             traceback.print_exc()
             return None

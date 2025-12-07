@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request
+﻿from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
 import os
@@ -25,7 +25,7 @@ try:
     from services.storage_ml_service import storage_ml_service
     STORAGE_ML_ENABLED = True
 except ImportError as e:
-    print(f"⚠️  Storage ML service not available: {e}")
+    print(f"[WARN]  Storage ML service not available: {e}")
     STORAGE_ML_ENABLED = False 
 
 # Import services
@@ -35,7 +35,7 @@ try:
     from services.logistics_service import logistics_service
     REALTIME_ENABLED = True
 except ImportError as e:
-    print(f"⚠️  Real-time services not available: {e}")
+    print(f"[WARN]  Real-time services not available: {e}")
     REALTIME_ENABLED = False
 
 app = Flask(__name__)
@@ -99,7 +99,19 @@ def get_weather_by_coords():
     """Get weather data by coordinates"""
     if not REALTIME_ENABLED:
         return jsonify({'error': 'Real-time services not available'}), 503
-    return jsonify({'message': 'Real-time ML service started', 'interval': 10})
+    
+    lat = request.args.get('lat')
+    lon = request.args.get('lon')
+    
+    if not lat or not lon:
+        return jsonify({'error': 'lat and lon parameters required'}), 400
+    
+    try:
+        weather = weather_service.get_weather_by_coords(float(lat), float(lon))
+        return jsonify(weather)
+    except Exception as e:
+        print(f"[Weather] Error fetching coords weather: {e}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/realtime/stop', methods=['POST'])
 def stop_realtime():
@@ -201,6 +213,102 @@ def models_status():
     
     return jsonify(status)
 
+# ============ TRANSPORT OPTIMIZATION ENDPOINTS ============
+
+@app.route('/api/transport/optimize', methods=['POST'])
+def optimize_transport_route():
+    """
+    Get TOP 3 transport options: Best, Cheapest, Fastest
+    ---
+    parameters:
+      - name: body
+        in: body
+        schema:
+          type: object
+          properties:
+            origin: { type: string }
+            destination: { type: string }
+            quantity: { type: number }
+            priority: { type: string }
+    responses:
+      200:
+        description: Transport optimization results
+    """
+    try:
+        from services.transport_optimizer import get_optimizer
+        
+        data = request.get_json()
+        origin = data.get('origin', 'Gujarat Solar H2 Plant')
+        destination = data.get('destination', 'Mumbai, Maharashtra')
+        quantity = float(data.get('quantity', 1000))
+        priority = data.get('priority', 'normal')
+        order_id = data.get('order_id')
+        
+        optimizer = get_optimizer()
+        result = optimizer.optimize_route(origin, destination, quantity, priority, order_id)
+        
+        return jsonify(result)
+    except Exception as e:
+        print(f"[Transport] Optimize error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/transport/track/<vehicle_id>', methods=['GET'])
+def track_vehicle(vehicle_id):
+    """Get real-time vehicle tracking data"""
+    try:
+        from services.transport_optimizer import get_optimizer
+        
+        optimizer = get_optimizer()
+        result = optimizer.get_vehicle_tracking(vehicle_id)
+        
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/transport/dispatch', methods=['POST'])
+def dispatch_transport():
+    """Dispatch a transport with selected option"""
+    try:
+        from services.transport_optimizer import get_optimizer
+        
+        data = request.get_json()
+        order_id = data.get('order_id')
+        selected_option = data.get('selected_option')
+        transport_details = data.get('transport_details', {})
+        
+        optimizer = get_optimizer()
+        result = optimizer.dispatch_transport(order_id, selected_option, transport_details)
+        
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/transport/fleet', methods=['GET'])
+def get_fleet_status():
+    """Get fleet status and statistics"""
+    try:
+        from services.transport_optimizer import get_optimizer
+        
+        optimizer = get_optimizer()
+        result = optimizer.get_fleet_status()
+        
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/transport/analytics', methods=['GET'])
+def get_transport_analytics():
+    """Get transport analytics and KPIs"""
+    try:
+        from services.transport_optimizer import get_optimizer
+        
+        optimizer = get_optimizer()
+        result = optimizer.get_transport_analytics()
+        
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/metrics', methods=['GET'])
 def get_metrics():
     """
@@ -283,49 +391,49 @@ bg_energy_service = BackgroundEnergyService(
 
 if __name__ == '__main__':
     print("=" * 70)
-    print("🚀 Green Hydrogen ML Service Starting...")
+    print(">>> Green Hydrogen ML Service Starting...")
     print("=" * 70)
     print()
     
     # Check Gemini API
     gemini_key = os.getenv('GEMINI_API_KEY', '')
     if gemini_key and gemini_key != 'your_gemini_api_key':
-        print(f"✅ Gemini AI enabled: {os.getenv('GEMINI_MODEL', 'gemini-2.0-flash-exp')}")
+        print(f"[OK] Gemini AI enabled: {os.getenv('GEMINI_MODEL', 'gemini-2.0-flash-exp')}")
     else:
-        print("⚠️  Gemini AI not configured (using fallback responses)")
+        print("[WARN] Gemini AI not configured (using fallback responses)")
     
     # Start real-time ML service
     if REALTIME_ENABLED:
         realtime_ml_service.start()
         logistics_service.start()
-        print("✅ Real-time ML service started")
-        print("✅ Logistics service started")
+        print("[OK] Real-time ML service started")
+        print("[OK] Logistics service started")
         
         # --- START THE 4-HOUR AGGREGATOR ---
         bg_energy_service.start()
-        print("✅ Background 4-Hour Aggregator started")
+        print("[OK] Background 4-Hour Aggregator started")
         
         # --- START STORAGE ML SERVICE ---
         if STORAGE_ML_ENABLED:
             storage_ml_service.start()
-            print("✅ Storage ML service started (Anomaly Detection, Health Prediction, Demand Forecasting, Inventory Optimization)")
+            print("[OK] Storage ML service started (Anomaly Detection, Health Prediction, Demand Forecasting, Inventory Optimization)")
         
         # Test weather API
         weather_test = weather_service.test_api_key()
         if weather_test['valid']:
-            print(f"✅ Weather API: {weather_test['message']}")
+            print(f"[OK] Weather API: {weather_test['message']}")
         else:
-            print(f"⚠️  Weather API: {weather_test['message']}")
+            print(f"[WARN] Weather API: {weather_test['message']}")
     else:
-        print("⚠️  Real-time services disabled")
+        print("[WARN] Real-time services disabled")
     
     print()
-    print(f"🌐 Starting Flask server on port 5001...")
-    print(f"📡 Socket.IO enabled for real-time updates")
-    print(f"🤖 Gemini chatbot ready")
-    print(f"🏭 Per-plant ML predictions available")
+    print(f"[SERVER] Starting Flask server on port 5001...")
+    print(f"[WS] Socket.IO enabled for real-time updates")
+    print(f"[AI] Gemini chatbot ready")
+    print(f"[ML] Per-plant ML predictions available")
     if STORAGE_ML_ENABLED:
-        print(f"📦 Storage ML endpoints available at /storage/*")
+        print(f"[STORAGE] Storage ML endpoints available at /storage/*")
     print()
     
     # Start background broadcast thread

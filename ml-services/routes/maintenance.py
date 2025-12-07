@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+﻿from flask import Blueprint, request, jsonify
 from supabase import create_client
 import os
 from datetime import datetime
@@ -10,7 +10,7 @@ supabase_url = os.getenv('SUPABASE_URL')
 supabase_key = os.getenv('SUPABASE_SERVICE_ROLE_KEY') or os.getenv('SUPABASE_KEY')
 supabase = create_client(supabase_url, supabase_key)
 
-print(f"✅ Maintenance routes using {'SERVICE_ROLE' if os.getenv('SUPABASE_SERVICE_ROLE_KEY') else 'ANON'} key")
+print(f"[OK] Maintenance routes using {'SERVICE_ROLE' if os.getenv('SUPABASE_SERVICE_ROLE_KEY') else 'ANON'} key")
 
 @maintenance_bp.route('/stats', methods=['GET'])
 def get_dashboard_stats():
@@ -101,9 +101,9 @@ def get_recent_alerts():
 def get_vehicles_list():
     """Get list of all vehicles from database for dropdown selection"""
     try:
-        print("🔍 Fetching vehicles from database...")
+        print("[INFO] Fetching vehicles from database...")
         vehicles = supabase.table('vehicles').select('id, registration, status').execute().data or []
-        print(f"✅ Found {len(vehicles)} vehicles: {vehicles}")
+        print(f"[OK] Found {len(vehicles)} vehicles: {vehicles}")
         return jsonify({'vehicles': vehicles})
     except Exception as e:
         print(f"Vehicles Error: {e}")
@@ -143,9 +143,9 @@ def schedule_service():
 def get_calendar_events():
     """Get all maintenance events for calendar display"""
     try:
-        print("🔍 Fetching calendar events...")
+        print("[INFO] Fetching calendar events...")
         events = supabase.table('maintenance_events').select('*').order('due_date').execute().data or []
-        print(f"✅ Found {len(events)} calendar events")
+        print(f"[OK] Found {len(events)} calendar events")
         
         schedule = []
         for event in events:

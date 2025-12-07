@@ -1,4 +1,4 @@
-"""Test hybrid plant recommender"""
+﻿"""Test hybrid plant recommender"""
 from models.plant_recommender import plant_recommender
 
 print("="*60)
@@ -42,5 +42,5 @@ print(f"   ML Score: {score_result['ml_score']:.3f if score_result['ml_score'] e
 print(f"   Final Hybrid Score: {score_result['hybrid_score']:.3f}")
 
 print("\n" + "="*60)
-print("✅ Hybrid recommender is working!")
+print("[OK] Hybrid recommender is working!")
 print("="*60)

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Storage ML API Routes
 Provides REST endpoints for storage ML predictions and analysis
 """
@@ -15,7 +15,7 @@ try:
     from models.inventory_optimizer import inventory_optimizer
     STORAGE_ML_AVAILABLE = True
 except ImportError as e:
-    print(f"⚠️ Storage ML components not available: {e}")
+    print(f"[WARN] Storage ML components not available: {e}")
     STORAGE_ML_AVAILABLE = False
 
 storage_bp = Blueprint('storage', __name__)
@@ -442,16 +442,16 @@ def _generate_ai_summary(anomaly_result: dict, health_result: dict) -> str:
     # Anomaly status
     if is_anomaly:
         sensors = ', '.join(anomalous_sensors) if anomalous_sensors else 'sensors'
-        summary_parts.append(f"⚠️ Anomaly detected in {sensors}.")
+        summary_parts.append(f"[WARN] Anomaly detected in {sensors}.")
     else:
-        summary_parts.append("✅ No anomalies detected.")
+        summary_parts.append("[OK] No anomalies detected.")
     
     # Health status
     summary_parts.append(f"Container health: {health_score:.1f}% ({health_status}).")
     
     # Maintenance recommendation
     if maintenance_prob > 70:
-        summary_parts.append("🔧 Maintenance strongly recommended.")
+        summary_parts.append("[FIX] Maintenance strongly recommended.")
     elif maintenance_prob > 40:
         summary_parts.append("📋 Consider scheduling maintenance.")
     

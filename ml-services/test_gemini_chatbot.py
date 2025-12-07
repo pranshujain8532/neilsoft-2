@@ -1,4 +1,4 @@
-"""
+﻿"""
 Test script for Gemini AI Chatbot
 Demonstrates example conversations and validates responses
 """
@@ -36,22 +36,22 @@ def test_chatbot(question):
             print(f"❓ Question: {question}")
             print(f"{'='*70}")
             print(f"🤖 Response: {data.get('response', 'No response')}")
-            print(f"📊 Model: {data.get('model', 'Unknown')}")
-            print(f"✅ Success: {data.get('success', False)}")
+            print(f"[DATA] Model: {data.get('model', 'Unknown')}")
+            print(f"[OK] Success: {data.get('success', False)}")
             return data
         else:
-            print(f"❌ Error: Status {response.status_code}")
+            print(f"[ERROR] Error: Status {response.status_code}")
             print(f"Response: {response.text}")
             return None
             
     except Exception as e:
-        print(f"❌ Exception: {e}")
+        print(f"[ERROR] Exception: {e}")
         return None
 
 def main():
     """Run chatbot tests"""
     print("\n" + "="*70)
-    print("🚀 Gemini AI Chatbot Test Suite")
+    print("[START] Gemini AI Chatbot Test Suite")
     print("="*70)
     print(f"📡 Endpoint: {CHATBOT_URL}")
     print(f"🧪 Test Questions: {len(test_questions)}")
@@ -72,11 +72,11 @@ def main():
     
     # Summary
     print("\n\n" + "="*70)
-    print("📊 TEST SUMMARY")
+    print("[DATA] TEST SUMMARY")
     print("="*70)
     successful = sum(1 for r in results if r['success'])
-    print(f"✅ Successful: {successful}/{len(results)}")
-    print(f"❌ Failed: {len(results) - successful}/{len(results)}")
+    print(f"[OK] Successful: {successful}/{len(results)}")
+    print(f"[ERROR] Failed: {len(results) - successful}/{len(results)}")
     print(f"📈 Success Rate: {(successful/len(results)*100):.1f}%")
     print("="*70)
 

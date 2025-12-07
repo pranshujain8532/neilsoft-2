@@ -1,4 +1,4 @@
-"""
+﻿"""
 Weather API Integration Service
 Fetches real-time weather data for energy forecasting using Open-Meteo (Free, No API Key)
 """

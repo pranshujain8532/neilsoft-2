@@ -1,4 +1,4 @@
-"""
+﻿"""
 Script to run profit predictions and save them to the database
 This fetches all plants and generates profit predictions using the trained model
 """
@@ -25,7 +25,7 @@ url = os.environ.get('VITE_SUPABASE_URL')
 key = os.environ.get('VITE_SUPABASE_ANON_KEY')
 
 if not url or not key:
-    print("❌ Missing Supabase credentials")
+    print("[ERROR] Missing Supabase credentials")
     exit(1)
 
 supabase = create_client(url, key)
@@ -40,10 +40,10 @@ response = supabase.table('plants').select('*').execute()
 plants = response.data
 
 if not plants:
-    print("❌ No plants found")
+    print("[ERROR] No plants found")
     exit(1)
 
-print(f"✅ Found {len(plants)} plants\n")
+print(f"[OK] Found {len(plants)} plants\n")
 
 # Generate predictions for each plant
 for i, plant in enumerate(plants, 1):
@@ -75,7 +75,7 @@ for i, plant in enumerate(plants, 1):
             lcoh = 2.0
             print(f"   Using default values")
     except Exception as e:
-        print(f"   ⚠️ Could not fetch production data: {e}")
+        print(f"   [WARN] Could not fetch production data: {e}")
         production_kg = 500
         lcoh = 2.0
     
@@ -92,10 +92,10 @@ for i, plant in enumerate(plants, 1):
     prediction = profit_predictor.predict(plant_data, save_to_db=True)
     
     print(f"   💰 Predicted Daily Profit: ${prediction['predicted_profit']:,.2f}")
-    print(f"   📊 Confidence: {prediction['confidence'] * 100:.1f}%")
+    print(f"   [DATA] Confidence: {prediction['confidence'] * 100:.1f}%")
     print(f"   🤖 Model: {prediction['model_type']}")
-    print(f"   💡 {prediction['recommendation']}\n")
+    print(f"   [TIP] {prediction['recommendation']}\n")
 
 print("=" * 60)
-print("✅ All predictions generated and saved to database!")
+print("[OK] All predictions generated and saved to database!")
 print("=" * 60)

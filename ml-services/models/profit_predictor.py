@@ -1,4 +1,4 @@
-"""
+﻿"""
 LSTM-based Profit Prediction Model for Green Hydrogen Production
 Predicts future profitability based on historical data, energy mix, and Oxygen byproduct savings.
 All data fetched from Supabase - no hardcoded values.
@@ -57,7 +57,7 @@ class ProfitPredictor:
         )
         
         self.model = model
-        print("✅ LSTM Profit Predictor model built successfully")
+        print("[OK] LSTM Profit Predictor model built successfully")
     
     def _init_supabase(self):
         """Initialize Supabase client for fetching real production data"""
@@ -80,12 +80,12 @@ class ProfitPredictor:
             key = os.environ.get('SUPABASE_SERVICE_ROLE_KEY') or os.environ.get('SUPABASE_KEY') or os.environ.get('VITE_SUPABASE_ANON_KEY')
             
             if not url or not key:
-                print(f"⚠️ Missing Supabase credentials")
+                print(f"[WARN] Missing Supabase credentials")
                 return None
             
             return create_client(url, key)
         except Exception as e:
-            print(f"⚠️ Could not initialize Supabase: {e}")
+            print(f"[WARN] Could not initialize Supabase: {e}")
             return None
     
     def fetch_real_production_data(self, min_days: int = 1) -> Optional[pd.DataFrame]:
@@ -120,11 +120,11 @@ class ProfitPredictor:
                 print(f"ℹ️ Only {len(df)} records found, need at least {min_days}")
                 return None
             
-            print(f"✅ Fetched {len(df)} production records from Supabase")
+            print(f"[OK] Fetched {len(df)} production records from Supabase")
             return df
             
         except Exception as e:
-            print(f"⚠️ Error fetching production data: {e}")
+            print(f"[WARN] Error fetching production data: {e}")
             return None
     
     def _fetch_market_data(self) -> Dict:
@@ -153,7 +153,7 @@ class ProfitPredictor:
             
             return {'h2_price': 4.5, 'electricity_cost': 0.05}
         except Exception as e:
-            print(f"⚠️ Error fetching market data: {e}")
+            print(f"[WARN] Error fetching market data: {e}")
             return {'h2_price': 4.5, 'electricity_cost': 0.05}
     
     def _process_real_data_to_sequences(self, real_data: pd.DataFrame) -> Tuple[List, List]:
@@ -229,7 +229,7 @@ class ProfitPredictor:
         np.random.seed(42)
         
         # Try to fetch real production data from Supabase
-        print("🔍 Checking for real production data in Supabase...")
+        print("[INFO] Checking for real production data in Supabase...")
         real_df = self.fetch_real_production_data(min_days=1)
         
         # Fetch market data for synthetic samples
@@ -246,7 +246,7 @@ class ProfitPredictor:
                 X_data.extend(real_sequences)
                 y_data.extend(real_targets)
                 real_samples_count = len(real_sequences)
-                print(f"✅ Added {real_samples_count} real data samples to training set")
+                print(f"[OK] Added {real_samples_count} real data samples to training set")
         
         # Generate synthetic data
         synthetic_samples = num_samples - real_samples_count if real_samples_count > 0 else num_samples
@@ -298,7 +298,7 @@ class ProfitPredictor:
             profit = ((avg_price - avg_lcoh) * avg_production * 1000) + avg_o2_value - avg_labor
             y_data.append(profit)
         
-        print(f"📊 Total training samples: {len(X_data)} ({real_samples_count} real + {synthetic_samples} synthetic)")
+        print(f"[DATA] Total training samples: {len(X_data)} ({real_samples_count} real + {synthetic_samples} synthetic)")
         
         X = np.array(X_data)
         y = np.array(y_data)
@@ -317,13 +317,13 @@ class ProfitPredictor:
     def train(self, epochs=100, batch_size=32):
         """Train the LSTM model with enhanced dataset"""
         if not HAS_TF:
-            print("⚠️ TensorFlow not available, skipping training")
+            print("[WARN] TensorFlow not available, skipping training")
             return None, 0
         
         print("🔄 Generating enhanced training data...")
         X_train, y_train = self.generate_training_data(num_samples=100000)
         
-        print(f"📊 Training data shape: X={X_train.shape}, y={y_train.shape}")
+        print(f"[DATA] Training data shape: X={X_train.shape}, y={y_train.shape}")
         print("🎓 Training LSTM Profit Predictor...")
         print(f"   Target: 80%+ validation accuracy")
         
@@ -353,7 +353,7 @@ class ProfitPredictor:
         val_loss = min(history.history['val_loss'])
         accuracy = max(0, 100 - (val_mae / abs(self.scaler_params.get('y_mean', 100000)) * 100))
         
-        print(f"\n✅ Model training completed!")
+        print(f"\n[OK] Model training completed!")
         print(f"   Final Validation MAE: {val_mae:.2f}")
         print(f"   Final Validation Loss: {val_loss:.2f}")
         print(f"   Estimated Accuracy: {accuracy:.1f}%")
@@ -366,7 +366,7 @@ class ProfitPredictor:
         try:
             supabase = self._init_supabase()
             if not supabase:
-                print("⚠️ Cannot save prediction: Supabase not available")
+                print("[WARN] Cannot save prediction: Supabase not available")
                 return False
             
             prediction_record = {
@@ -377,11 +377,11 @@ class ProfitPredictor:
             }
             
             supabase.table('ml_predictions').insert(prediction_record).execute()
-            print(f"✅ Saved profit prediction for plant {plant_id}")
+            print(f"[OK] Saved profit prediction for plant {plant_id}")
             return True
             
         except Exception as e:
-            print(f"❌ Error saving prediction to DB: {e}")
+            print(f"[ERROR] Error saving prediction to DB: {e}")
             return False
     
     def predict(self, plant_data: Dict, save_to_db: bool = False) -> Dict:
@@ -441,7 +441,7 @@ class ProfitPredictor:
                                 ]
                                 history_data.append(row_feats)
                 except Exception as e:
-                    print(f"⚠️ Error fetching specific plant history: {e}")
+                    print(f"[WARN] Error fetching specific plant history: {e}")
 
             # Padding Logic
             missing_days = self.sequence_length - len(history_data)
@@ -544,9 +544,9 @@ class ProfitPredictor:
                     self.scaler_params = {k: np.array(v) if isinstance(v, list) else v 
                                           for k, v in params.items()}
             
-            print(f"✅ Model loaded from {self.model_path}")
+            print(f"[OK] Model loaded from {self.model_path}")
         except Exception as e:
-            print(f"⚠️ Could not load model: {e}")
+            print(f"[WARN] Could not load model: {e}")
             self.build_model()
 
 

@@ -1,4 +1,4 @@
-from supabase import create_client, Client
+﻿from supabase import create_client, Client
 import os
 
 SUPABASE_URL = "https://mnigrozyrnimwzczehbr.supabase.co"
@@ -15,9 +15,9 @@ def test_connection():
         response = supabase.table('production_history').select('*').limit(1).execute()
         print("Response received.")
         print(response)
-        print("✅ Connection successful!")
+        print("[OK] Connection successful!")
     except Exception as e:
-        print(f"❌ Connection failed: {e}")
+        print(f"[ERROR] Connection failed: {e}")
 
 if __name__ == "__main__":
     test_connection()

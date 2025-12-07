@@ -1,4 +1,4 @@
-"""
+﻿"""
 Storage ML Service - Background Service for Real-Time ML Predictions
 Integrates all storage ML models and provides continuous monitoring
 """
@@ -24,7 +24,7 @@ try:
     from models.inventory_optimizer import inventory_optimizer
     MODELS_AVAILABLE = True
 except ImportError as e:
-    print(f"⚠️ Storage ML models not available: {e}")
+    print(f"[WARN] Storage ML models not available: {e}")
     MODELS_AVAILABLE = False
 
 
@@ -79,22 +79,22 @@ class StorageMLService:
         
         if url and key:
             self.supabase = create_client(url, key)
-            print("✅ Storage ML Service: Supabase initialized")
+            print("[OK] Storage ML Service: Supabase initialized")
     
     def start(self):
         """Start the background service"""
         if self.running:
-            print("⚠️ Storage ML Service already running")
+            print("[WARN] Storage ML Service already running")
             return
         
         if not MODELS_AVAILABLE:
-            print("⚠️ Storage ML models not available, service not started")
+            print("[WARN] Storage ML models not available, service not started")
             return
         
         self.running = True
         self.thread = threading.Thread(target=self._run_loop, daemon=True)
         self.thread.start()
-        print("✅ Storage ML Service started")
+        print("[OK] Storage ML Service started")
     
     def stop(self):
         """Stop the background service"""
@@ -135,7 +135,7 @@ class StorageMLService:
                 time.sleep(10)  # Check every 10 seconds
                 
             except Exception as e:
-                print(f"❌ Error in Storage ML Service loop: {e}")
+                print(f"[ERROR] Error in Storage ML Service loop: {e}")
                 time.sleep(30)  # Wait before retrying
     
     def _run_all_predictions(self):
@@ -152,7 +152,7 @@ class StorageMLService:
         self.last_forecast = time.time()
         self.last_optimization = time.time()
         
-        print("✅ Initial predictions completed")
+        print("[OK] Initial predictions completed")
     
     def _get_containers(self) -> List[Dict]:
         """Fetch all containers from Supabase"""
@@ -188,7 +188,7 @@ class StorageMLService:
                 
                 # Log if anomaly detected
                 if result.get('is_anomaly'):
-                    print(f"⚠️ Anomaly detected in container {container.get('name', container['id'])}")
+                    print(f"[WARN] Anomaly detected in container {container.get('name', container['id'])}")
                     
             except Exception as e:
                 print(f"Error in anomaly detection for {container['id']}: {e}")
@@ -404,7 +404,7 @@ class StorageMLService:
         except Exception as e:
             results['inventory_optimizer'] = {'error': str(e)}
         
-        print("\n✅ All models training completed!")
+        print("\n[OK] All models training completed!")
         
         return results
 

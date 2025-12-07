@@ -157,13 +157,14 @@ const Storage = () => {
 
     const resolveAlert = async (alertId: string) => {
         try {
+            // Delete the alert from database instead of just updating status
             await supabase
                 .from('storage_alerts')
-                .update({ status: 'resolved', resolved_at: new Date().toISOString() })
+                .delete()
                 .eq('id', alertId);
             setAlerts((prev) => prev.filter((a) => a.id !== alertId));
         } catch (error) {
-            console.error('Error resolving alert:', error);
+            console.error('Error resolving/deleting alert:', error);
         }
     };
 

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Hydrogen Demand Forecaster using Bidirectional LSTM with Attention
 Forecasts hydrogen consumption/transaction patterns for storage optimization
 """
@@ -17,7 +17,7 @@ try:
     HAS_TF = True
 except ImportError:
     HAS_TF = False
-    print("⚠️ TensorFlow not available for DemandForecaster")
+    print("[WARN] TensorFlow not available for DemandForecaster")
 
 try:
     from supabase import create_client, Client
@@ -154,7 +154,7 @@ class DemandForecaster:
             metrics=['mae']
         )
         
-        print("✅ Demand Forecaster Bidirectional LSTM built")
+        print("[OK] Demand Forecaster Bidirectional LSTM built")
         print(f"   Lookback period: {self.lookback} days")
         print(f"   Forecast horizons: 24h, 7d, 30d")
     
@@ -208,11 +208,11 @@ class DemandForecaster:
                     i / len(dates)  # Trend component
                 ])
             
-            print(f"✅ Fetched {len(data)} days of transaction data")
+            print(f"[OK] Fetched {len(data)} days of transaction data")
             return np.array(data)
             
         except Exception as e:
-            print(f"❌ Error fetching transactions: {e}")
+            print(f"[ERROR] Error fetching transactions: {e}")
             return None
     
     def generate_synthetic_data(self, n_days: int = 365) -> np.ndarray:
@@ -299,7 +299,7 @@ class DemandForecaster:
     def train(self, epochs: int = 100, batch_size: int = 32) -> Dict:
         """Train the demand forecasting model"""
         if not HAS_TF:
-            print("⚠️ TensorFlow not available")
+            print("[WARN] TensorFlow not available")
             return {'success': False, 'error': 'TensorFlow not available'}
         
         print("🔄 Training Demand Forecaster...")
@@ -359,7 +359,7 @@ class DemandForecaster:
         # Get metrics
         val_loss = min(history.history['val_loss'])
         
-        print(f"\n✅ Training completed!")
+        print(f"\n[OK] Training completed!")
         print(f"   Validation Loss: {val_loss:.4f}")
         
         self.save_model()
@@ -584,10 +584,10 @@ class DemandForecaster:
                             'std': np.array(params['std'])
                         }
             
-            print(f"✅ Demand forecaster loaded from {self.model_path}")
+            print(f"[OK] Demand forecaster loaded from {self.model_path}")
             
         except Exception as e:
-            print(f"⚠️ Could not load model: {e}")
+            print(f"[WARN] Could not load model: {e}")
             self.build_model()
 
 

@@ -99,6 +99,40 @@ export const authAPI = {
     },
 };
 
+// Order API
+export const orderAPI = {
+    getAll: async () => {
+        const { data, error } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
+        if (error) throw error;
+        return { data };
+    },
+    getById: async (id: string) => {
+        const { data, error } = await supabase.from('orders').select('*').eq('id', id).single();
+        if (error) throw error;
+        return { data };
+    },
+    create: async (orderData: any) => {
+        const { data, error } = await supabase.from('orders').insert(orderData).select().single();
+        if (error) throw error;
+        return { data };
+    },
+    update: async (id: string, updates: any) => {
+        const { data, error } = await supabase.from('orders').update(updates).eq('id', id).select();
+        if (error) throw error;
+        return { data };
+    },
+    updateStatus: async (id: string, status: string) => {
+        const { data, error } = await supabase.from('orders').update({ status }).eq('id', id).select();
+        if (error) throw error;
+        return { data };
+    },
+    delete: async (id: string) => {
+        const { error } = await supabase.from('orders').delete().eq('id', id);
+        if (error) throw error;
+        return { success: true };
+    }
+};
+
 export const plantAPI = {
     getAll: async () => {
         const { data, error } = await supabase.from('plants').select('*');
@@ -149,10 +183,67 @@ export const transportAPI = {
         if (error) throw error;
         return { data };
     },
-    optimizeRoute: async (data: any) => {
-        // Placeholder for route optimization
-        console.log('optimizeRoute not implemented in Supabase migration', data);
-        return { data: { route: [] } };
+    // NEW: Get fleet with stats - fetch directly from Supabase
+    getFleetWithStats: async () => {
+        try {
+            const { data: vehicles, error } = await supabase.from('vehicles').select('*');
+            if (error) throw error;
+
+            const vehicleList = vehicles || [];
+            const inTransit = vehicleList.filter((v: any) => v.status === 'in-transit');
+            const idle = vehicleList.filter((v: any) => v.status === 'idle');
+            const loading = vehicleList.filter((v: any) => v.status === 'loading');
+
+            const totalCapacity = vehicleList.reduce((sum: number, v: any) => sum + (v.capacity || 0), 0);
+            const currentLoad = vehicleList.reduce((sum: number, v: any) => sum + (v.current_load || 0), 0);
+            const utilization = vehicleList.length > 0 ? (inTransit.length / vehicleList.length) * 100 : 0;
+
+            return {
+                vehicles: vehicleList,
+                stats: {
+                    total: vehicleList.length,
+                    in_transit: inTransit.length,
+                    idle: idle.length,
+                    loading: loading.length,
+                    utilization_percent: Math.round(utilization),
+                    total_capacity_kg: totalCapacity,
+                    current_load_kg: currentLoad
+                }
+            };
+        } catch (error) {
+            console.error('Failed to fetch fleet stats:', error);
+            return { vehicles: [], stats: { total: 0, in_transit: 0, idle: 0, loading: 0, utilization_percent: 0 } };
+        }
+    },
+    // NEW: Call ML service for route optimization
+    optimizeRoute: async (data: { origin: string; destination: string; quantity: number; priority?: string }) => {
+        try {
+            const response = await mlApi.post('/api/transport/optimize', data);
+            return response.data;
+        } catch (error) {
+            console.error('Route optimization failed:', error);
+            throw error;
+        }
+    },
+    // NEW: Get vehicle tracking from ML service
+    getVehicleTracking: async (vehicleId: string) => {
+        try {
+            const response = await mlApi.get(`/api/transport/track/${vehicleId}`);
+            return response.data;
+        } catch (error) {
+            console.error('Vehicle tracking failed:', error);
+            return { error: 'Tracking unavailable' };
+        }
+    },
+    // NEW: Dispatch transport via ML service
+    dispatchTransport: async (data: { order_id: string; selected_option: string; transport_details: any }) => {
+        try {
+            const response = await mlApi.post('/api/transport/dispatch', data);
+            return response.data;
+        } catch (error) {
+            console.error('Dispatch failed:', error);
+            throw error;
+        }
     },
     assignVehicle: async (data: { vehicleId: string, orderId: string }) => {
         const { data: vehicle, error } = await supabase.from('vehicles')
@@ -231,18 +322,14 @@ export const storageAPI = {
         if (error) throw error;
         return { data };
     },
-    resolveAlert: async (id: string, userId?: string, notes?: string) => {
-        const { data, error } = await supabase
+    resolveAlert: async (id: string) => {
+        // Delete the alert from database instead of just updating status
+        const { error } = await supabase
             .from('storage_alerts')
-            .update({
-                status: 'resolved',
-                resolved_at: new Date().toISOString(),
-                resolved_by: userId,
-                resolution_notes: notes
-            })
+            .delete()
             .eq('id', id);
         if (error) throw error;
-        return { data };
+        return { success: true };
     },
     getSensorReadings: async (containerId: string, limit: number = 100) => {
         const { data, error } = await supabase
@@ -278,29 +365,6 @@ export const storageAPI = {
             .insert(transaction)
             .select()
             .single();
-        if (error) throw error;
-        return { data };
-    },
-};
-
-export const orderAPI = {
-    create: async (data: any) => {
-        const { data: order, error } = await supabase.from('orders').insert(data).select().single();
-        if (error) throw error;
-        return { data: order };
-    },
-    getAll: async () => {
-        const { data, error } = await supabase.from('orders').select('*');
-        if (error) throw error;
-        return { data };
-    },
-    getById: async (id: string) => {
-        const { data, error } = await supabase.from('orders').select('*').eq('id', id).single();
-        if (error) throw error;
-        return { data };
-    },
-    updateStatus: async (id: string, status: string) => {
-        const { data, error } = await supabase.from('orders').update({ status }).eq('id', id).select();
         if (error) throw error;
         return { data };
     },

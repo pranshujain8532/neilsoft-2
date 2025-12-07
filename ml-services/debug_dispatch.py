@@ -1,4 +1,4 @@
-"""Debug Smart Dispatch - Test the recommender directly"""
+﻿"""Debug Smart Dispatch - Test the recommender directly"""
 import os
 from dotenv import load_dotenv
 load_dotenv()
@@ -43,11 +43,11 @@ if orders.data:
     result = engine.recommend_for_order(test_order)
     
     if result:
-        print(f"✅ SUCCESS!")
+        print(f"[OK] SUCCESS!")
         print(f"   Plant: {result['plant']['name']}")
         print(f"   Transport: {result['transport_method']}")
         print(f"   Explanation: {result['explanation']}")
     else:
-        print("❌ FAILED: recommend_for_order returned None")
+        print("[ERROR] FAILED: recommend_for_order returned None")
 else:
-    print("\n⚠️ No pending/confirmed orders to test with")
+    print("\n[WARN] No pending/confirmed orders to test with")

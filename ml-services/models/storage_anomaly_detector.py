@@ -1,4 +1,4 @@
-"""
+﻿"""
 Storage Anomaly Detection using LSTM Autoencoder
 Detects abnormal sensor readings (pressure, temperature, level, purity) in real-time
 """
@@ -17,7 +17,7 @@ try:
     HAS_TF = True
 except ImportError:
     HAS_TF = False
-    print("⚠️ TensorFlow not available for StorageAnomalyDetector")
+    print("[WARN] TensorFlow not available for StorageAnomalyDetector")
 
 try:
     from supabase import create_client, Client
@@ -100,14 +100,14 @@ class StorageAnomalyDetector:
             metrics=['mae']
         )
         
-        print("✅ Storage Anomaly Detector LSTM Autoencoder built")
+        print("[OK] Storage Anomaly Detector LSTM Autoencoder built")
         print(f"   Input shape: ({self.sequence_length}, {self.n_features})")
         print(f"   Latent space: 16 dimensions")
     
     def fetch_training_data(self, days: int = 30) -> Optional[np.ndarray]:
         """Fetch sensor readings from Supabase for training"""
         if not self.supabase:
-            print("⚠️ Supabase not initialized, using synthetic data")
+            print("[WARN] Supabase not initialized, using synthetic data")
             return None
         
         try:
@@ -116,7 +116,7 @@ class StorageAnomalyDetector:
             containers = containers_response.data
             
             if not containers:
-                print("⚠️ No containers found")
+                print("[WARN] No containers found")
                 return None
             
             all_sequences = []
@@ -162,13 +162,13 @@ class StorageAnomalyDetector:
                     all_sequences.append(seq)
             
             if all_sequences:
-                print(f"✅ Fetched {len(all_sequences)} sequences from Supabase")
+                print(f"[OK] Fetched {len(all_sequences)} sequences from Supabase")
                 return np.array(all_sequences)
             
             return None
             
         except Exception as e:
-            print(f"❌ Error fetching training data: {e}")
+            print(f"[ERROR] Error fetching training data: {e}")
             return None
     
     def generate_synthetic_data(self, n_samples: int = 5000) -> Tuple[np.ndarray, np.ndarray]:
@@ -262,10 +262,10 @@ class StorageAnomalyDetector:
     def train(self, epochs: int = 50, batch_size: int = 32) -> Dict:
         """Train the LSTM Autoencoder"""
         if not HAS_TF:
-            print("⚠️ TensorFlow not available")
+            print("[WARN] TensorFlow not available")
             return {'success': False, 'error': 'TensorFlow not available'}
         
-        print("🔄 Training Storage Anomaly Detector...")
+        print("[INFO] Training Storage Anomaly Detector...")
         
         # Try to fetch real data first
         real_data = self.fetch_training_data()
@@ -305,7 +305,7 @@ class StorageAnomalyDetector:
         
         val_loss = min(history.history['val_loss'])
         
-        print(f"\n✅ Training completed!")
+        print(f"\n[OK] Training completed!")
         print(f"   Validation Loss: {val_loss:.6f}")
         print(f"   Anomaly Threshold: {self.threshold:.6f}")
         
@@ -388,7 +388,7 @@ class StorageAnomalyDetector:
             return result
             
         except Exception as e:
-            print(f"❌ Error in anomaly detection: {e}")
+            print(f"[ERROR] Error in anomaly detection: {e}")
             return self._fallback_detection(sensor_data)
     
     def _fetch_recent_readings(self, container_id: str) -> List[List[float]]:
@@ -440,7 +440,7 @@ class StorageAnomalyDetector:
             
             if existing.data and len(existing.data) > 0:
                 # Already has an open alert, don't create duplicate
-                print(f"ℹ️ Container {container_id} already has an open alert - skipping duplicate")
+                print(f"[INFO] Container {container_id} already has an open alert - skipping duplicate")
                 return
             
             alert_data = {
@@ -453,7 +453,7 @@ class StorageAnomalyDetector:
             }
             
             self.supabase.table('storage_alerts').insert(alert_data).execute()
-            print(f"⚠️ Alert created for container {container_id}")
+            print(f"[WARN] Alert created for container {container_id}")
             
         except Exception as e:
             print(f"Error creating alert: {e}")
@@ -511,7 +511,7 @@ class StorageAnomalyDetector:
                 'scaler_max': self.scaler_params['max'].tolist() if self.scaler_params else None
             }, f)
         
-        print(f"💾 Anomaly detector saved to {self.model_path}")
+        print(f"[OK] Anomaly detector saved to {self.model_path}")
     
     def load_model(self):
         """Load pre-trained model"""
@@ -532,10 +532,10 @@ class StorageAnomalyDetector:
                             'max': np.array(params['scaler_max'])
                         }
             
-            print(f"✅ Anomaly detector loaded from {self.model_path}")
+            print(f"[OK] Anomaly detector loaded from {self.model_path}")
             
         except Exception as e:
-            print(f"⚠️ Could not load model: {e}")
+            print(f"[WARN] Could not load model: {e}")
             self.build_model()
 
 

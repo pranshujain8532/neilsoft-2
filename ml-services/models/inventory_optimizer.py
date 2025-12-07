@@ -1,4 +1,4 @@
-"""
+﻿"""
 Inventory Optimizer using Deep Q-Network (DQN) - Reinforcement Learning
 Learns optimal reorder policies to minimize costs while avoiding stockouts
 """
@@ -19,7 +19,7 @@ try:
     HAS_TF = True
 except ImportError:
     HAS_TF = False
-    print("⚠️ TensorFlow not available for InventoryOptimizer")
+    print("[WARN] TensorFlow not available for InventoryOptimizer")
 
 try:
     from supabase import create_client, Client
@@ -251,7 +251,7 @@ class InventoryOptimizer:
         self.target_model = Model(inputs=inputs, outputs=outputs, name='TargetDQN')
         self.target_model.set_weights(self.model.get_weights())
         
-        print("✅ Inventory Optimizer DQN built")
+        print("[OK] Inventory Optimizer DQN built")
         print(f"   State size: {self.state_size}")
         print(f"   Action size: {self.action_size}")
     
@@ -320,7 +320,7 @@ class InventoryOptimizer:
     def train(self, episodes: int = 500) -> Dict:
         """Train the DQN agent"""
         if not HAS_TF:
-            print("⚠️ TensorFlow not available")
+            print("[WARN] TensorFlow not available")
             return {'success': False, 'error': 'TensorFlow not available'}
         
         print("🔄 Training Inventory Optimizer DQN...")
@@ -375,7 +375,7 @@ class InventoryOptimizer:
         final_avg_reward = np.mean(rewards_history[-100:])
         final_avg_stockouts = np.mean(stockouts_history[-100:])
         
-        print(f"\n✅ Training completed!")
+        print(f"\n[OK] Training completed!")
         print(f"   Final Avg Reward: {final_avg_reward:.1f}")
         print(f"   Final Avg Stockouts: {final_avg_stockouts:.2f}")
         
@@ -552,7 +552,7 @@ class InventoryOptimizer:
         
         elif action == 4:
             if alert:
-                return f"⚠️ CRITICAL: Fill level at {fill_level:.0f}%! Emergency reorder required immediately to prevent stockout."
+                return f"[WARN] CRITICAL: Fill level at {fill_level:.0f}%! Emergency reorder required immediately to prevent stockout."
             else:
                 return f"Low inventory with only {days_of_supply:.0f} days supply. Emergency reorder strongly recommended."
         
@@ -607,10 +607,10 @@ class InventoryOptimizer:
                     params = json.load(f)
                     self.epsilon = params.get('epsilon', 0.01)
             
-            print(f"✅ Inventory optimizer loaded from {self.model_path}")
+            print(f"[OK] Inventory optimizer loaded from {self.model_path}")
             
         except Exception as e:
-            print(f"⚠️ Could not load model: {e}")
+            print(f"[WARN] Could not load model: {e}")
             self.build_model()
 
 

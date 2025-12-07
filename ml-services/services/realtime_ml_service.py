@@ -1,4 +1,4 @@
-"""
+﻿"""
 Real-Time ML Prediction Service
 Continuously updates ML predictions using latest weather data and a trained Random Forest model
 """
@@ -37,21 +37,21 @@ class RealtimeMLService:
                 self._train_model()
             else:
                 self.model = joblib.load(self.model_path)
-                print("✅ Loaded existing ML model")
+                print("[OK] Loaded existing ML model")
 
             self.running = True
             self.update_thread = threading.Thread(target=self._update_loop, daemon=True)
             self.update_thread.start()
-            print("✅ Real-time ML service started")
+            print("[OK] Real-time ML service started")
     
     def stop(self):
         """Stop real-time updates"""
         self.running = False
-        print("🛑 Real-time ML service stopped")
+        print("[STOP] Real-time ML service stopped")
     
     def _train_model(self):
         """Train a Random Forest model on synthetic data"""
-        print("🔄 Generating 100,000 synthetic data points for training...")
+        print("[INFO] Generating 100,000 synthetic data points for training...")
         
         # 1. Generate Synthetic Data
         n_samples = 100000
@@ -82,14 +82,14 @@ class RealtimeMLService:
         y = h2_production
         
         # 2. Train Model
-        print("🧠 Training Random Forest Regressor...")
+        print("[INFO] Training Random Forest Regressor...")
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
         
         self.model = RandomForestRegressor(n_estimators=50, n_jobs=-1)
         self.model.fit(X_train, y_train)
         
         score = self.model.score(X_test, y_test)
-        print(f"✅ Model trained! R² Score: {score:.4f}")
+        print(f"[OK] Model trained! R² Score: {score:.4f}")
         
         # Save model
         os.makedirs(os.path.dirname(self.model_path), exist_ok=True)
@@ -114,7 +114,7 @@ class RealtimeMLService:
                 
                 # Hourly updates to Database
                 if current_time - last_db_update >= db_update_interval:
-                    print("⏰ Triggering hourly database update...")
+                    print("[INFO] Triggering hourly database update...")
                     self._save_hourly_data()
                     last_db_update = current_time
                 
@@ -179,7 +179,7 @@ class RealtimeMLService:
             key = os.environ.get('SUPABASE_SERVICE_ROLE_KEY') or os.environ.get('SUPABASE_KEY')
             
             if not url or not key:
-                print("⚠️ Missing Supabase credentials, skipping DB update")
+                print("[WARN] Missing Supabase credentials, skipping DB update")
                 return
 
             supabase = create_client(url, key)
@@ -189,10 +189,10 @@ class RealtimeMLService:
             plants = response.data
             
             if not plants:
-                print("⚠️ No plants found for hourly update")
+                print("[WARN] No plants found for hourly update")
                 return
 
-            print(f"🔄 Processing hourly updates for {len(plants)} plants...")
+            print(f"[INFO] Processing hourly updates for {len(plants)} plants...")
             
             # Import models
             from models.profit_predictor import profit_predictor
@@ -243,10 +243,10 @@ class RealtimeMLService:
                 }
                 supabase.table('ml_predictions').insert(ml_data_energy).execute()
                 
-            print("✅ Hourly database update completed successfully")
+            print("[OK] Hourly database update completed successfully")
 
         except Exception as e:
-            print(f"❌ Error in _save_hourly_data: {e}")
+            print(f"[ERROR] Error in _save_hourly_data: {e}")
 
 # Global instance
 realtime_ml_service = RealtimeMLService()

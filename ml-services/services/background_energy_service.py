@@ -1,4 +1,4 @@
-import threading
+﻿import threading
 import time
 import numpy as np
 import requests
@@ -14,7 +14,7 @@ import os
 try:
     from models.energy_forecaster import energy_forecaster
 except ImportError:
-    print("⚠️ BackgroundService: Could not import energy_forecaster. Make sure models/energy_forecaster.py exists.")
+    print("[WARN] BackgroundService: Could not import energy_forecaster. Make sure models/energy_forecaster.py exists.")
     energy_forecaster = None
 
 class BackgroundEnergyService:
@@ -51,7 +51,7 @@ class BackgroundEnergyService:
                     self.last_upload_time = current_time
                     
             except Exception as e:
-                print(f"⚠️ Error in Background Energy Loop: {e}")
+                print(f"[WARN] Error in Background Energy Loop: {e}")
                 traceback.print_exc()
             
             # Sleep for collection interval
@@ -94,14 +94,14 @@ class BackgroundEnergyService:
 
     def _process_averages_and_upload(self):
         """Calculates 4-hour averages and uploads to Supabase"""
-        print("\n📊 4 Hours Passed. Aggregating and Uploading Data...")
+        print("\n[DATA] 4 Hours Passed. Aggregating and Uploading Data...")
         
         history_batch = []
         prediction_batch = []
         
         # We process whatever is in the buffer
         if not self.data_buffer:
-            print("   ⚠️ Buffer empty, skipping upload.")
+            print("   [WARN] Buffer empty, skipping upload.")
             return
 
         try:
@@ -142,18 +142,18 @@ class BackgroundEnergyService:
             # --- BULK INSERT ---
             if history_batch:
                 self.supabase.table('production_history').insert(history_batch).execute()
-                print(f"✅ Uploaded {len(history_batch)} aggregated history records.")
+                print(f"[OK] Uploaded {len(history_batch)} aggregated history records.")
                 
             if prediction_batch:
                 self.supabase.table('ml_predictions').insert(prediction_batch).execute()
-                print(f"✅ Uploaded {len(prediction_batch)} forecast records.")
+                print(f"[OK] Uploaded {len(prediction_batch)} forecast records.")
 
             # Clear Buffer ONLY after successful upload
             self.data_buffer = {} 
-            print("✅ RAM Buffer flushed.")
+            print("[OK] RAM Buffer flushed.")
 
         except Exception as e:
-            print(f"❌ Upload Failed! Keeping data in buffer for retry. Error: {e}")
+            print(f"[ERROR] Upload Failed! Keeping data in buffer for retry. Error: {e}")
 
     # --- UPDATED: CONSISTENT PREDICTION LOGIC ---
     def _predict_mw_consistent(self, ptype, capacity, w):
@@ -228,5 +228,5 @@ class BackgroundEnergyService:
                 'solar_irradiance': 0 
             }
         except Exception as e:
-            # print(f"⚠️ Weather Fetch Error: {e}") 
+            # print(f"[WARN] Weather Fetch Error: {e}") 
             return None
