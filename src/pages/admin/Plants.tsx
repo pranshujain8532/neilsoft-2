@@ -3,12 +3,64 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     Activity, Wrench, XCircle, MapPin, TrendingUp, Zap, Sun, Wind, Droplets,
     ThermometerSun, Cloud, X, History, DollarSign, Leaf, Clock, ChevronRight,
-    RefreshCw, Gauge
+    RefreshCw, Gauge, Plus, Loader2, CheckCircle, AlertTriangle, Info, Sparkles
 } from 'lucide-react';
 import { plantAPI, productionHistoryAPI, mlApi } from '@/utils/api';
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
+
+// Site Feasibility Types
+interface SiteEvaluation {
+    success: boolean;
+    location: { latitude: number; longitude: number; name?: string };
+    evaluations: {
+        solar: EnergyEvaluation;
+        wind: WindEvaluation;
+        hydro: EnergyEvaluation;
+    };
+    scores: { solar: number; wind: number; hydro: number };
+    overall_score: number;
+    recommendation: {
+        type: string;
+        title: string;
+        electrolysis: string;
+        primary_reason: string;
+        detailed_reasons: DetailedReason[];
+        viable_sources: string[];
+    };
+}
+
+interface EnergyEvaluation {
+    score: number;
+    grade: string;
+    reasoning: string;
+    conditions: { metric: string; value: string; status: string }[];
+}
+
+interface WindEvaluation extends EnergyEvaluation {
+    wind_speed_10m: number;
+    wind_speed_80m: number;
+    hellman_calculation: {
+        formula: string;
+        v1: number;
+        z1: number;
+        z2: number;
+        alpha: number;
+        power_factor: number;
+        v2: number;
+    };
+}
+
+interface DetailedReason {
+    source: string;
+    score: number;
+    grade: string;
+    summary: string;
+    icon: string;
+    color: string;
+    physics?: any;
+}
 
 interface Plant {
     id: string;
@@ -63,6 +115,16 @@ const Plants = () => {
     const [_mlPrediction, setMlPrediction] = useState<MLPrediction | null>(null);
     const [loadingDetails, setLoadingDetails] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
+
+    // Add Plant Wizard State
+    const [showAddWizard, setShowAddWizard] = useState(false);
+    const [wizardStep, setWizardStep] = useState(1);
+    const [newPlantCoords, setNewPlantCoords] = useState({ lat: '', lon: '' });
+    const [newPlantName, setNewPlantName] = useState('');
+    const [newPlantCapacity, setNewPlantCapacity] = useState('');
+    const [evaluating, setEvaluating] = useState(false);
+    const [siteEvaluation, setSiteEvaluation] = useState<SiteEvaluation | null>(null);
+    const [addingPlant, setAddingPlant] = useState(false);
 
     useEffect(() => {
         fetchPlants();
@@ -266,6 +328,29 @@ const Plants = () => {
                                 </div>
                             </motion.div>
                         ))}
+                    </div>
+                </motion.div>
+
+                {/* Add New Plant Card */}
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                    onClick={() => { setShowAddWizard(true); setWizardStep(1); setSiteEvaluation(null); }}
+                    className="mb-8 p-6 rounded-2xl bg-gradient-to-r from-hydrogen-900/30 to-purple-900/30 border-2 border-dashed border-hydrogen-500/40 cursor-pointer hover:border-hydrogen-500/80 transition-all group"
+                >
+                    <div className="flex items-center justify-center gap-4">
+                        <div className="p-4 rounded-full bg-hydrogen-500/20 group-hover:bg-hydrogen-500/30 transition-colors">
+                            <Plus className="w-8 h-8 text-hydrogen-400" />
+                        </div>
+                        <div>
+                            <h3 className="text-xl font-bold text-white group-hover:text-hydrogen-300 transition-colors">
+                                Add New Green Hydrogen Plant
+                            </h3>
+                            <p className="text-gray-400 text-sm mt-1">
+                                Evaluate site feasibility using AI + Google Maps + Weather APIs
+                            </p>
+                        </div>
                     </div>
                 </motion.div>
 
@@ -589,6 +674,387 @@ const Plants = () => {
                                                 <p className="text-gray-400 text-sm">This plant supports direct hydrogen pipeline delivery for long distances.</p>
                                             </div>
                                         </div>
+                                    )}
+                                </div>
+                            </motion.div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
+                {/* Add Plant Wizard Modal */}
+                <AnimatePresence>
+                    {showAddWizard && (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                            onClick={() => setShowAddWizard(false)}
+                        >
+                            <motion.div
+                                initial={{ scale: 0.9, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                exit={{ scale: 0.9, opacity: 0 }}
+                                className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-3xl border border-hydrogen-500/30 
+                                           w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl shadow-hydrogen-500/10"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                {/* Wizard Header */}
+                                <div className="sticky top-0 bg-gray-900/95 backdrop-blur-sm border-b border-gray-700/50 p-6 flex justify-between items-center z-10">
+                                    <div className="flex items-center gap-4">
+                                        <div className="p-3 rounded-xl bg-gradient-to-br from-hydrogen-500/20 to-purple-600/20 border border-hydrogen-500/30">
+                                            <Sparkles className="w-6 h-6 text-hydrogen-400" />
+                                        </div>
+                                        <div>
+                                            <h2 className="text-2xl font-bold text-white">Add New Green Hydrogen Plant</h2>
+                                            <p className="text-gray-400 text-sm">Step {wizardStep} of 3 - Site Feasibility Engine</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => setShowAddWizard(false)}
+                                        className="p-2 rounded-full hover:bg-gray-700/50 transition-colors"
+                                    >
+                                        <X className="w-6 h-6 text-gray-400" />
+                                    </button>
+                                </div>
+
+                                {/* Step Progress */}
+                                <div className="px-6 pt-4">
+                                    <div className="flex items-center gap-2">
+                                        {[1, 2, 3].map((step) => (
+                                            <div key={step} className="flex items-center gap-2 flex-1">
+                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold
+                                                    ${wizardStep >= step ? 'bg-hydrogen-500 text-white' : 'bg-gray-700 text-gray-400'}`}>
+                                                    {wizardStep > step ? <CheckCircle className="w-5 h-5" /> : step}
+                                                </div>
+                                                {step < 3 && (
+                                                    <div className={`flex-1 h-1 rounded ${wizardStep > step ? 'bg-hydrogen-500' : 'bg-gray-700'}`} />
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="flex justify-between text-xs text-gray-500 mt-2">
+                                        <span>Location</span>
+                                        <span>Evaluation</span>
+                                        <span>Confirm</span>
+                                    </div>
+                                </div>
+
+                                <div className="p-6">
+                                    {/* Step 1: Location Input */}
+                                    {wizardStep === 1 && (
+                                        <motion.div
+                                            initial={{ opacity: 0, x: 20 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            className="space-y-6"
+                                        >
+                                            <div className="text-center py-4">
+                                                <MapPin className="w-16 h-16 text-hydrogen-400 mx-auto mb-4" />
+                                                <h3 className="text-xl font-bold text-white">Enter Plant Location</h3>
+                                                <p className="text-gray-400 mt-2">Provide latitude and longitude coordinates for feasibility analysis</p>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-sm text-gray-400 mb-2">Latitude</label>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="e.g., 23.0225"
+                                                        value={newPlantCoords.lat}
+                                                        onChange={(e) => setNewPlantCoords({ ...newPlantCoords, lat: e.target.value })}
+                                                        className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-hydrogen-500 focus:outline-none"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm text-gray-400 mb-2">Longitude</label>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="e.g., 72.5714"
+                                                        value={newPlantCoords.lon}
+                                                        onChange={(e) => setNewPlantCoords({ ...newPlantCoords, lon: e.target.value })}
+                                                        className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-hydrogen-500 focus:outline-none"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            {/* Demo Locations */}
+                                            <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+                                                <p className="text-sm text-gray-400 mb-3">📍 Quick Test Locations:</p>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {[
+                                                        { name: 'Jaisalmer (Solar)', lat: '26.92', lon: '70.91' },
+                                                        { name: 'Kanyakumari (Wind)', lat: '8.09', lon: '77.54' },
+                                                        { name: 'Sardar Sarovar (Hydro)', lat: '21.83', lon: '73.75' },
+                                                        { name: 'Ahmedabad', lat: '23.02', lon: '72.57' },
+                                                    ].map((loc) => (
+                                                        <button
+                                                            key={loc.name}
+                                                            onClick={() => setNewPlantCoords({ lat: loc.lat, lon: loc.lon })}
+                                                            className="px-3 py-1.5 bg-gray-700 hover:bg-hydrogen-500/30 rounded-full text-sm text-gray-300 hover:text-white transition-colors"
+                                                        >
+                                                            {loc.name}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            <button
+                                                onClick={async () => {
+                                                    if (!newPlantCoords.lat || !newPlantCoords.lon) return;
+                                                    setEvaluating(true);
+                                                    try {
+                                                        const res = await mlApi.post('/site-feasibility/evaluate', {
+                                                            lat: parseFloat(newPlantCoords.lat),
+                                                            lon: parseFloat(newPlantCoords.lon)
+                                                        });
+                                                        if (res.data?.success) {
+                                                            setSiteEvaluation(res.data);
+                                                            setWizardStep(2);
+                                                        }
+                                                    } catch (err) {
+                                                        console.error('Evaluation failed:', err);
+                                                    } finally {
+                                                        setEvaluating(false);
+                                                    }
+                                                }}
+                                                disabled={!newPlantCoords.lat || !newPlantCoords.lon || evaluating}
+                                                className="w-full py-4 bg-gradient-to-r from-hydrogen-500 to-hydrogen-600 hover:from-hydrogen-400 hover:to-hydrogen-500 
+                                                           text-white font-bold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                            >
+                                                {evaluating ? (
+                                                    <>
+                                                        <Loader2 className="w-5 h-5 animate-spin" />
+                                                        Evaluating Site Feasibility...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Sparkles className="w-5 h-5" />
+                                                        Analyze Location with AI
+                                                    </>
+                                                )}
+                                            </button>
+                                        </motion.div>
+                                    )}
+
+                                    {/* Step 2: Evaluation Results */}
+                                    {wizardStep === 2 && siteEvaluation && (
+                                        <motion.div
+                                            initial={{ opacity: 0, x: 20 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            className="space-y-6"
+                                        >
+                                            {/* Overall Score */}
+                                            <div className="text-center py-4">
+                                                <div className="relative w-32 h-32 mx-auto mb-4">
+                                                    <svg className="w-full h-full transform -rotate-90">
+                                                        <circle cx="64" cy="64" r="56" fill="none" stroke="#374151" strokeWidth="8" />
+                                                        <circle
+                                                            cx="64" cy="64" r="56" fill="none"
+                                                            stroke={siteEvaluation.overall_score >= 70 ? '#10b981' : siteEvaluation.overall_score >= 50 ? '#f59e0b' : '#ef4444'}
+                                                            strokeWidth="8"
+                                                            strokeLinecap="round"
+                                                            strokeDasharray={`${(siteEvaluation.overall_score / 100) * 352} 352`}
+                                                        />
+                                                    </svg>
+                                                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                                        <span className="text-3xl font-bold text-white">{siteEvaluation.overall_score.toFixed(0)}</span>
+                                                        <span className="text-xs text-gray-400">Overall</span>
+                                                    </div>
+                                                </div>
+                                                <h3 className="text-xl font-bold text-white">{siteEvaluation.recommendation.title}</h3>
+                                                <p className="text-hydrogen-400 text-sm mt-1">{siteEvaluation.recommendation.electrolysis}</p>
+                                            </div>
+
+                                            {/* Source Scores */}
+                                            <div className="grid grid-cols-3 gap-4">
+                                                {[
+                                                    { key: 'solar', icon: Sun, color: 'yellow', label: 'Solar' },
+                                                    { key: 'wind', icon: Wind, color: 'blue', label: 'Wind' },
+                                                    { key: 'hydro', icon: Droplets, color: 'cyan', label: 'Hydro' }
+                                                ].map((source) => {
+                                                    const score = siteEvaluation.scores[source.key as keyof typeof siteEvaluation.scores];
+                                                    const evalu = siteEvaluation.evaluations[source.key as keyof typeof siteEvaluation.evaluations];
+                                                    return (
+                                                        <div key={source.key} className={`p-4 rounded-xl bg-${source.color}-500/10 border border-${source.color}-500/30`}>
+                                                            <source.icon className={`w-8 h-8 text-${source.color}-400 mb-2`} />
+                                                            <p className="text-2xl font-bold text-white">{score.toFixed(0)}</p>
+                                                            <p className="text-gray-400 text-sm">{source.label}</p>
+                                                            <span className={`text-xs px-2 py-0.5 rounded-full ${evalu.grade === 'Excellent' ? 'bg-green-500/20 text-green-400' :
+                                                                    evalu.grade === 'Good' ? 'bg-blue-500/20 text-blue-400' :
+                                                                        evalu.grade === 'Fair' ? 'bg-yellow-500/20 text-yellow-400' :
+                                                                            'bg-red-500/20 text-red-400'
+                                                                }`}>{evalu.grade}</span>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+
+                                            {/* Primary Reason */}
+                                            <div className="p-4 bg-hydrogen-500/10 rounded-xl border border-hydrogen-500/30">
+                                                <div className="flex items-start gap-3">
+                                                    <Info className="w-5 h-5 text-hydrogen-400 flex-shrink-0 mt-0.5" />
+                                                    <div>
+                                                        <p className="text-white font-medium">Why this recommendation?</p>
+                                                        <p className="text-gray-300 text-sm mt-1">{siteEvaluation.recommendation.primary_reason}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Detailed Reasoning */}
+                                            <div className="space-y-3">
+                                                <h4 className="text-white font-semibold">Detailed Analysis:</h4>
+                                                {siteEvaluation.recommendation.detailed_reasons.map((reason, i) => (
+                                                    <div key={i} className="p-4 bg-gray-800/50 rounded-xl border border-gray-700">
+                                                        <div className="flex items-center gap-2 mb-2">
+                                                            <span className="text-xl">{reason.icon}</span>
+                                                            <span className="font-medium text-white">{reason.source}</span>
+                                                            <span className={`ml-auto text-sm ${reason.grade === 'Excellent' ? 'text-green-400' :
+                                                                    reason.grade === 'Good' ? 'text-blue-400' :
+                                                                        reason.grade === 'Fair' ? 'text-yellow-400' :
+                                                                            'text-red-400'
+                                                                }`}>{reason.score.toFixed(0)}/100</span>
+                                                        </div>
+                                                        <p className="text-gray-400 text-sm">{reason.summary}</p>
+
+                                                        {/* Hellman Power Law Display for Wind */}
+                                                        {reason.physics && reason.source === 'Wind' && (
+                                                            <div className="mt-3 p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                                                                <p className="text-xs text-blue-400 font-mono mb-2">Hellman Power Law Calculation:</p>
+                                                                <div className="text-sm text-gray-300 font-mono">
+                                                                    <p>v₂ = v₁ × (z₂/z₁)^α</p>
+                                                                    <p className="mt-1">
+                                                                        <span className="text-cyan-400">{reason.physics.v2?.toFixed(1)} m/s</span>
+                                                                        {' = '}
+                                                                        <span className="text-gray-400">{reason.physics.v1?.toFixed(1)}</span>
+                                                                        {' × '}
+                                                                        <span className="text-gray-400">({reason.physics.z2}/{reason.physics.z1})^{reason.physics.alpha}</span>
+                                                                    </p>
+                                                                    <p className="text-xs text-gray-500 mt-1">
+                                                                        α = {reason.physics.alpha} (open terrain friction coefficient)
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+
+                                            <div className="flex gap-4">
+                                                <button
+                                                    onClick={() => { setWizardStep(1); setSiteEvaluation(null); }}
+                                                    className="flex-1 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-xl transition-colors"
+                                                >
+                                                    ← Back
+                                                </button>
+                                                <button
+                                                    onClick={() => setWizardStep(3)}
+                                                    className="flex-1 py-3 bg-gradient-to-r from-hydrogen-500 to-hydrogen-600 hover:from-hydrogen-400 hover:to-hydrogen-500 text-white font-bold rounded-xl transition-all"
+                                                >
+                                                    Configure Plant →
+                                                </button>
+                                            </div>
+                                        </motion.div>
+                                    )}
+
+                                    {/* Step 3: Plant Configuration */}
+                                    {wizardStep === 3 && siteEvaluation && (
+                                        <motion.div
+                                            initial={{ opacity: 0, x: 20 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            className="space-y-6"
+                                        >
+                                            <div className="text-center py-4">
+                                                <CheckCircle className="w-16 h-16 text-green-400 mx-auto mb-4" />
+                                                <h3 className="text-xl font-bold text-white">Configure Your Plant</h3>
+                                                <p className="text-gray-400 mt-2">Recommended: {siteEvaluation.recommendation.title}</p>
+                                            </div>
+
+                                            <div className="space-y-4">
+                                                <div>
+                                                    <label className="block text-sm text-gray-400 mb-2">Plant Name</label>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="e.g., Ahmedabad Solar-PEM Plant"
+                                                        value={newPlantName}
+                                                        onChange={(e) => setNewPlantName(e.target.value)}
+                                                        className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-hydrogen-500 focus:outline-none"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm text-gray-400 mb-2">Capacity (kW)</label>
+                                                    <input
+                                                        type="number"
+                                                        placeholder="e.g., 1000"
+                                                        value={newPlantCapacity}
+                                                        onChange={(e) => setNewPlantCapacity(e.target.value)}
+                                                        className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-hydrogen-500 focus:outline-none"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            {/* Summary Card */}
+                                            <div className="p-4 bg-gradient-to-r from-hydrogen-500/10 to-purple-500/10 rounded-xl border border-hydrogen-500/30">
+                                                <h4 className="text-white font-medium mb-3">Plant Summary:</h4>
+                                                <div className="grid grid-cols-2 gap-3 text-sm">
+                                                    <div><span className="text-gray-400">Location:</span> <span className="text-white">{newPlantCoords.lat}°N, {newPlantCoords.lon}°E</span></div>
+                                                    <div><span className="text-gray-400">Type:</span> <span className="text-hydrogen-400">{siteEvaluation.recommendation.type}</span></div>
+                                                    <div><span className="text-gray-400">Solar Score:</span> <span className="text-yellow-400">{siteEvaluation.scores.solar.toFixed(0)}</span></div>
+                                                    <div><span className="text-gray-400">Wind Score:</span> <span className="text-blue-400">{siteEvaluation.scores.wind.toFixed(0)}</span></div>
+                                                    <div><span className="text-gray-400">Hydro Score:</span> <span className="text-cyan-400">{siteEvaluation.scores.hydro.toFixed(0)}</span></div>
+                                                    <div><span className="text-gray-400">Overall:</span> <span className="text-green-400">{siteEvaluation.overall_score.toFixed(0)}/100</span></div>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex gap-4">
+                                                <button
+                                                    onClick={() => setWizardStep(2)}
+                                                    className="flex-1 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-xl transition-colors"
+                                                >
+                                                    ← Back
+                                                </button>
+                                                <button
+                                                    onClick={async () => {
+                                                        if (!newPlantName || !newPlantCapacity) return;
+                                                        setAddingPlant(true);
+                                                        try {
+                                                            const res = await mlApi.post('/site-feasibility/add-plant', {
+                                                                evaluation: siteEvaluation,
+                                                                name: newPlantName,
+                                                                capacity_kw: parseFloat(newPlantCapacity)
+                                                            });
+                                                            if (res.data?.success) {
+                                                                setShowAddWizard(false);
+                                                                setNewPlantName('');
+                                                                setNewPlantCapacity('');
+                                                                setNewPlantCoords({ lat: '', lon: '' });
+                                                                setSiteEvaluation(null);
+                                                                setWizardStep(1);
+                                                                fetchPlants(); // Refresh list
+                                                            }
+                                                        } catch (err) {
+                                                            console.error('Failed to add plant:', err);
+                                                        } finally {
+                                                            setAddingPlant(false);
+                                                        }
+                                                    }}
+                                                    disabled={!newPlantName || !newPlantCapacity || addingPlant}
+                                                    className="flex-1 py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-400 hover:to-green-500 
+                                                               text-white font-bold rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                                                >
+                                                    {addingPlant ? (
+                                                        <>
+                                                            <Loader2 className="w-5 h-5 animate-spin" />
+                                                            Adding Plant...
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <CheckCircle className="w-5 h-5" />
+                                                            Add Plant to Database
+                                                        </>
+                                                    )}
+                                                </button>
+                                            </div>
+                                        </motion.div>
                                     )}
                                 </div>
                             </motion.div>

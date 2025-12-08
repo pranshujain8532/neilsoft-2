@@ -20,6 +20,7 @@ from routes.plant_maintenance import plant_maintenance_bp
 from routes.renewable_energy import renewable_energy_bp
 from routes.smart_surplus import smart_surplus_bp
 from routes.surplus_routing import surplus_routing_bp
+from routes.site_feasibility import site_feasibility_bp
 
 # --- NEW IMPORT ---
 from services.background_energy_service import BackgroundEnergyService
@@ -57,6 +58,7 @@ app.register_blueprint(plant_maintenance_bp, url_prefix='/plant-maintenance')
 app.register_blueprint(renewable_energy_bp, url_prefix='/renewable-energy')
 app.register_blueprint(smart_surplus_bp, url_prefix='/smart-surplus')
 app.register_blueprint(surplus_routing_bp, url_prefix='/surplus-routing')
+app.register_blueprint(site_feasibility_bp, url_prefix='/site-feasibility')
 
 @app.route('/')
 def home():
