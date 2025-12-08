@@ -185,7 +185,7 @@ const Maintenance: React.FC = () => {
                                 alerts.map((alert, i) => (
                                     <div key={i} className="flex gap-3 items-start pb-3 border-b border-gray-100 dark:border-gray-700 last:border-0 last:pb-0">
                                         <div className={`w-2 h-2 mt-2 rounded-full ${alert.type === 'critical' ? 'bg-red-500' :
-                                                alert.type === 'warning' ? 'bg-yellow-500' : 'bg-blue-500'
+                                            alert.type === 'warning' ? 'bg-yellow-500' : 'bg-blue-500'
                                             }`} />
                                         <div>
                                             <p className="text-sm font-medium text-gray-800 dark:text-gray-200">{alert.msg}</p>
