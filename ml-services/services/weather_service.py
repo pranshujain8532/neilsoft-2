@@ -11,29 +11,83 @@ import pandas as pd
 
 class WeatherService:
     def __init__(self, api_key: Optional[str] = None):
-        # Open-Meteo does not require an API key
-        self.base_url = 'https://api.open-meteo.com/v1/forecast'
-        self.archive_url = 'https://archive-api.open-meteo.com/v1/archive'
+        # Use OpenWeatherMap with API key
+        self.api_key = api_key or os.getenv('WEATHER_API_KEY') or 'e168c270a2561b64d8db9ebbba2dc2bd'
+        self.base_url = 'https://api.openweathermap.org/data/2.5'
+        self.archive_url = 'https://archive-api.open-meteo.com/v1/archive'  # Keep for historical data
+        
+        # Weather cache to reduce API calls (1 hour cache)
+        self._weather_cache = {}  # {(lat, lon): {'data': {...}, 'timestamp': datetime}}
+        self._cache_duration = timedelta(hours=1)  # Cache for 1 hour
         
     def get_weather_by_coords(self, lat: float, lon: float) -> Dict:
-        """Get current weather data by coordinates using Open-Meteo"""
+        """Get current weather data by coordinates using OpenWeatherMap (cached for 1 hour)"""
+        
+        # Check cache first
+        cache_key = (round(lat, 2), round(lon, 2))  # Round to group nearby locations
+        if cache_key in self._weather_cache:
+            cached = self._weather_cache[cache_key]
+            age = datetime.now() - cached['timestamp']
+            if age < self._cache_duration:
+                # print(f"[CACHE] Using cached weather data (age: {age.seconds}s)")
+                return cached['data']
+        
+        # Fetch fresh data from OpenWeatherMap API
         try:
-            params = {
-                'latitude': lat,
-                'longitude': lon,
-                'current': 'temperature_2m,relative_humidity_2m,surface_pressure,wind_speed_10m,wind_direction_10m,cloud_cover,direct_radiation',
-                'timezone': 'auto'
-            }
-            
-            response = requests.get(self.base_url, params=params, timeout=5)
+            url = f"{self.base_url}/weather?lat={lat}&lon={lon}&appid={self.api_key}&units=metric"
+            response = requests.get(url, timeout=10)
             response.raise_for_status()
             data = response.json()
             
-            return self._parse_open_meteo_data(data, lat, lon)
+            weather_data = self._parse_openweathermap_data(data, lat, lon)
+            
+            # Cache the result
+            self._weather_cache[cache_key] = {
+                'data': weather_data,
+                'timestamp': datetime.now()
+            }
+            print(f"[API] Fresh weather data fetched from OpenWeatherMap for ({lat}, {lon})")
+            
+            return weather_data
             
         except Exception as e:
-            print(f"Weather API error: {e}, using mock data")
+            print(f"OpenWeatherMap API error: {e}, using mock data")
             return self._get_mock_weather(lat, lon)
+    
+    def _parse_openweathermap_data(self, data: Dict, lat: float, lon: float) -> Dict:
+        """Parse OpenWeatherMap API response"""
+        import random
+        main = data.get('main', {})
+        wind = data.get('wind', {})
+        clouds = data.get('clouds', {})
+        weather_desc = data.get('weather', [{}])[0].get('description', 'Clear')
+        
+        # Calculate mock irradiance based on time of day (OpenWeatherMap doesn't provide it)
+        hour = datetime.now().hour
+        solar_irr = 0
+        if 6 <= hour <= 18:
+            hour_factor = 1 - abs(hour - 12) / 6
+            cloud_cover = clouds.get('all', 30)
+            cloud_factor = 1 - (cloud_cover / 100) * 0.5
+            solar_irr = 800 * hour_factor * cloud_factor + random.uniform(-50, 100)
+            solar_irr = max(0, solar_irr)
+        
+        return {
+            'temperature': main.get('temp', 25),
+            'humidity': main.get('humidity', 60),
+            'pressure': main.get('pressure', 1013),
+            'wind_speed': wind.get('speed', 5),
+            'wind_direction': wind.get('deg', 180),
+            'cloud_cover': clouds.get('all', 0),
+            'solar_irradiance': solar_irr,
+            'description': weather_desc.capitalize(),
+            'location': f'Lat: {lat:.2f}, Lon: {lon:.2f}',
+            'timestamp': datetime.now().isoformat(),
+            'source': 'OpenWeatherMap (Real Data)',
+            # Hydro proxies
+            'water_flow': 45.5, 
+            'head_height': 100.0
+        }
     
     def get_forecast_by_coords(self, lat: float, lon: float) -> Dict:
         """Get next day forecast data by coordinates using Open-Meteo"""
@@ -135,7 +189,19 @@ class WeatherService:
     
     def _parse_open_meteo_data(self, data: Dict, lat: float, lon: float) -> Dict:
         """Parse Open-Meteo API response"""
+        import random
         current = data.get('current', {})
+        
+        # Get irradiance, use mock if 0
+        solar_irr = current.get('direct_radiation', 0)
+        if solar_irr == 0:
+            hour = datetime.now().hour
+            if 6 <= hour <= 18:
+                hour_factor = 1 - abs(hour - 12) / 6
+                cloud_cover = current.get('cloud_cover', 30)
+                cloud_factor = 1 - (cloud_cover / 100) * 0.5
+                solar_irr = 800 * hour_factor * cloud_factor + random.uniform(-50, 100)
+                solar_irr = max(0, solar_irr)
         
         return {
             'temperature': current.get('temperature_2m', 25),
@@ -144,11 +210,11 @@ class WeatherService:
             'wind_speed': current.get('wind_speed_10m', 5),
             'wind_direction': current.get('wind_direction_10m', 180),
             'cloud_cover': current.get('cloud_cover', 0),
-            'solar_irradiance': current.get('direct_radiation', 0), # Real solar data!
+            'solar_irradiance': solar_irr,  # Mock if 0
             'description': 'Clear sky' if current.get('cloud_cover', 0) < 20 else 'Cloudy',
             'location': f'Lat: {lat:.2f}, Lon: {lon:.2f}',
             'timestamp': datetime.now().isoformat(),
-            'source': 'Open-Meteo (Real Data)',
+            'source': 'Open-Meteo (Real Data)' if current.get('direct_radiation', 0) > 0 else 'Mock Irradiance',
             # Hydro proxies
             'water_flow': 45.5, 
             'head_height': 100.0

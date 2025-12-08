@@ -24,10 +24,14 @@ class BackgroundEnergyService:
         self.running = False
         
         # --- BUFFER CONFIGURATION ---
-        self.data_buffer = {} # Stores 10-min snapshots: { plant_id: [records] }
-        self.collection_interval = 600 # Collect data every 10 minutes (600s)
+        self.data_buffer = {} # Stores hourly snapshots: { plant_id: [records] }
+        self.collection_interval = 3600 # Collect data every 1 hour (3600s) to save API calls
         self.upload_interval = 14400   # Upload average every 4 hours (14400s)
         self.last_upload_time = time.time()
+        
+        # Weather cache to avoid redundant API calls
+        self._weather_cache = {}
+        self._cache_timestamp = None
 
     def start(self):
         """Start the background thread"""
@@ -173,8 +177,20 @@ class BackgroundEnergyService:
         
         # Estimate Irradiance from Cloud Cover if API didn't provide it
         irr = w.get('solar_irradiance', 0)
-        if irr == 0 and w.get('clouds') is not None:
-             irr = (100 - w['clouds']) * 10 
+        if irr == 0:
+            # Use mock irradiance based on time of day
+            import random
+            hour = datetime.now().hour
+            if 6 <= hour <= 18:  # Daytime hours
+                # Peak at noon, simulate sun curve
+                hour_factor = 1 - abs(hour - 12) / 6  # 0 at 6am/6pm, 1 at noon
+                base_irr = 800 * hour_factor  # Max 800 W/m²
+                # Add some randomness
+                cloud_factor = 1 - (w.get('clouds', 30) / 100) * 0.5
+                irr = base_irr * cloud_factor + random.uniform(-50, 50)
+                irr = max(0, irr)
+            else:
+                irr = 0  # Night time
 
         model_input = {
             'irradiance': irr,

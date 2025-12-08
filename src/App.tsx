@@ -17,6 +17,8 @@ import Analytics from './pages/admin/Analytics';
 import LaborManagement from './pages/admin/LaborManagement';
 import EnergyMix from './pages/admin/EnergyMix';
 import Plants from './pages/admin/Plants';
+import PlantMaintenance from './pages/admin/PlantMaintenance';
+import RenewableEnergy from './pages/admin/RenewableEnergy';
 // Removed: import AdminMetrics from './pages/AdminMetrics';
 
 // Transport
@@ -56,10 +58,12 @@ function App() {
                                     <Route path="dashboard" element={<AdminDashboard />} />
                                     <Route path="plant-monitoring" element={<PlantMonitoring />} />
                                     <Route path="plants" element={<Plants />} />
+                                    <Route path="plant-maintenance" element={<PlantMaintenance />} />
                                     <Route path="orders" element={<OrderManagement />} />
                                     <Route path="analytics" element={<Analytics />} />
                                     <Route path="labor" element={<LaborManagement />} />
                                     <Route path="energy-mix" element={<EnergyMix />} />
+                                    <Route path="renewable-energy" element={<RenewableEnergy />} />
 
                                 </Routes>
                             </>

@@ -252,10 +252,6 @@ const Dashboard = () => {
                                             <span className="text-gray-600 dark:text-gray-400">Efficiency:</span>
                                             <span className="font-bold text-blue-500">{plant.profit_prediction?.efficiency_data?.electrolyzer_efficiency || plant.profit_prediction?.breakdown?.efficiency || '—'}%</span>
                                         </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-gray-600 dark:text-gray-400">Model:</span>
-                                            <span className="font-bold text-purple-500">{plant.profit_prediction?.model_type || 'Physics-Based'}</span>
-                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -293,17 +289,12 @@ const Dashboard = () => {
                                 ? 'bg-green-50 border-green-300 dark:bg-green-900/20 dark:border-green-700'
                                 : 'bg-yellow-50 border-yellow-300 dark:bg-yellow-900/20 dark:border-yellow-700'
                                 }`}>
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center space-x-3">
-                                        <AlertCircle className={`w-5 h-5 ${plant.safety_status?.status === 'optimal' ? 'text-green-600' : 'text-yellow-600'
-                                            }`} />
-                                        <div>
-                                            <span className="font-bold">Safety Status: </span>
-                                            <span className="capitalize">{plant.safety_status?.status}</span>
-                                        </div>
-                                    </div>
-                                    <div className="text-sm text-gray-600 dark:text-gray-400">
-                                        Anomaly Score: {plant.safety_status?.anomaly_score?.toFixed(3) || '0.000'}
+                                <div className="flex items-center space-x-3">
+                                    <AlertCircle className={`w-5 h-5 ${plant.safety_status?.status === 'optimal' ? 'text-green-600' : 'text-yellow-600'
+                                        }`} />
+                                    <div>
+                                        <span className="font-bold">Safety Status: </span>
+                                        <span className="capitalize">{plant.safety_status?.status}</span>
                                     </div>
                                 </div>
                             </div>
@@ -313,39 +304,65 @@ const Dashboard = () => {
 
 
 
-                {/* Plant Locations Map */}
+                {/* Plant Locations Map with Dynamic Pin Markers */}
                 <div className="card-glass p-6 mb-8">
                     <h3 className="text-xl font-bold mb-4 flex items-center">
                         <MapPin className="w-5 h-5 mr-2 text-hydrogen-500" />
                         Live Plant Network
                     </h3>
                     <div className="w-full h-[400px] rounded-lg overflow-hidden relative">
-                        <iframe
-                            width="100%"
-                            height="100%"
-                            style={{ border: 0 }}
-                            loading="lazy"
-                            allowFullScreen
-                            referrerPolicy="no-referrer-when-downgrade"
-                            src={`https://www.google.com/maps/embed/v1/view?key=AIzaSyDyaStNd9U3Q0BF4tDi-URy8ez19VpN57U&center=20.5937,78.9629&zoom=5&maptype=satellite`}
-                        ></iframe>
+                        {/* Google Maps Static API with actual pin markers */}
+                        <img
+                            src={`https://maps.googleapis.com/maps/api/staticmap?center=20.5,78.5&zoom=5&size=1200x400&scale=2&maptype=roadmap${plants.map((p, i) => {
+                                const locationStr = typeof p.location === 'string' ? p.location : (p.location?.city || p.location?.state || '');
+                                const lat = p.weather?.lat || (locationStr.includes('Tamil') ? 11.1271 : locationStr.includes('Gujarat') ? 23.0225 : 19.0760);
+                                const lng = p.weather?.lng || (locationStr.includes('Tamil') ? 78.6569 : locationStr.includes('Gujarat') ? 72.5714 : 72.8777);
+                                const color = p.safety_status?.status === 'optimal' ? 'green' : 'orange';
+                                const label = String.fromCharCode(65 + i); // A, B, C...
+                                return `&markers=color:${color}|label:${label}|${lat},${lng}`;
+                            }).join('')}&key=AIzaSyDyaStNd9U3Q0BF4tDi-URy8ez19VpN57U`}
+                            alt="Plant Locations Map"
+                            className="w-full h-full object-cover"
+                        />
 
-                        {/* Overlay Plant Markers (Simulated Visuals) */}
-                        <div className="absolute top-4 right-4 bg-white/90 dark:bg-black/80 p-4 rounded-lg backdrop-blur-sm text-xs">
-                            <div className="font-bold mb-2">Active Plants</div>
+                        {/* Interactive overlay for clicking */}
+                        <a
+                            href={`https://www.google.com/maps/search/?api=1&query=hydrogen+plant+india`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="absolute inset-0 cursor-pointer"
+                            title="Click to open in Google Maps"
+                        />
+
+                        {/* Dynamic Plant Legend from actual data */}
+                        <div className="absolute top-4 right-4 bg-white/95 dark:bg-black/90 p-4 rounded-lg backdrop-blur-sm text-xs shadow-lg max-h-[350px] overflow-y-auto">
+                            <div className="font-bold mb-3 text-sm">📍 Plant Locations ({plants.length})</div>
                             <div className="space-y-2">
-                                <div className="flex items-center">
-                                    <span className="w-2 h-2 rounded-full bg-green-500 mr-2"></span>
-                                    Gujarat (Solar)
-                                </div>
-                                <div className="flex items-center">
-                                    <span className="w-2 h-2 rounded-full bg-blue-500 mr-2"></span>
-                                    Maharashtra (Hybrid)
-                                </div>
-                                <div className="flex items-center">
-                                    <span className="w-2 h-2 rounded-full bg-yellow-500 mr-2"></span>
-                                    Tamil Nadu (Wind)
-                                </div>
+                                {plants.map((plant, i) => (
+                                    <div key={plant.plant_id} className="flex items-center justify-between gap-4 py-1.5 border-b border-gray-200 dark:border-gray-700 last:border-0">
+                                        <div className="flex items-center">
+                                            <span className={`w-6 h-6 rounded-full mr-2 flex items-center justify-center text-white text-xs font-bold ${plant.safety_status?.status === 'optimal' ? 'bg-green-500' : 'bg-orange-500'}`}>
+                                                {String.fromCharCode(65 + i)}
+                                            </span>
+                                            <div>
+                                                <div className="font-medium">{plant.plant_name}</div>
+                                                <div className="text-gray-400 text-[10px]">
+                                                    {typeof plant.location === 'string'
+                                                        ? plant.location
+                                                        : `${plant.location?.city || ''}, ${plant.location?.state || ''}`}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="font-bold text-green-600">{plant.profit_prediction?.h2_production_kg?.toLocaleString() || 0} kg</div>
+                                            <div className="text-gray-400 text-[10px]">${plant.lcoh?.toFixed(2)}/kg</div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="mt-3 pt-2 border-t border-gray-300 dark:border-gray-600 text-xs text-gray-500">
+                                <div className="flex items-center gap-2"><span className="w-4 h-4 bg-green-500 rounded-full text-white text-[10px] flex items-center justify-center">✓</span> Optimal</div>
+                                <div className="flex items-center gap-2 mt-1"><span className="w-4 h-4 bg-orange-500 rounded-full text-white text-[10px] flex items-center justify-center">!</span> Warning</div>
                             </div>
                         </div>
                     </div>

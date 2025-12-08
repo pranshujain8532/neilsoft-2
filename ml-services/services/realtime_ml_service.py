@@ -23,7 +23,7 @@ from services.weather_service import weather_service
 class RealtimeMLService:
     def __init__(self):
         self.running = False
-        self.update_interval = 10  # seconds
+        self.update_interval = 60  # seconds (weather is cached hourly, no need to poll frequently)
         self.latest_predictions = {}
         self.latest_weather = {}
         self.model = None
@@ -130,9 +130,19 @@ class RealtimeMLService:
         weather = weather_service.get_weather_by_coords(23.0225, 72.5714)
         self.latest_weather = weather
         
-        # Prepare input for model
+        # Prepare input for model - use mock irradiance if 0
+        solar_irr = weather.get('solar_irradiance', 0)
+        if solar_irr == 0:
+            # Generate mock irradiance based on time of day
+            import random
+            hour = datetime.now().hour
+            if 6 <= hour <= 18:
+                hour_factor = 1 - abs(hour - 12) / 6
+                solar_irr = 800 * hour_factor + random.uniform(-50, 100)
+                solar_irr = max(0, solar_irr)
+        
         input_data = pd.DataFrame([{
-            'irradiance': weather.get('solar_irradiance', 0),
+            'irradiance': solar_irr,
             'temperature': weather.get('temperature', 25),
             'wind_speed': weather.get('wind_speed', 5),
             'humidity': weather.get('humidity', 50)

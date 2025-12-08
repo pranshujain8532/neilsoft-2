@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
-import { Menu, X, Home, LayoutDashboard, Factory, TruckIcon, Container, ShoppingCart, LogOut, Sun, Moon, Package } from 'lucide-react';
+import { Menu, X, Home, LayoutDashboard, Factory, TruckIcon, Container, ShoppingCart, LogOut, Sun, Moon, Package, Wrench, Zap } from 'lucide-react';
 import { useTheme } from '@/hooks/useTheme';
 
 const Navbar = () => {
@@ -56,6 +56,14 @@ const Navbar = () => {
                                     <Link to="/maintenance" className="navbar-link flex items-center space-x-1">
                                         <TruckIcon size={18} />
                                         <span>Maintenance</span>
+                                    </Link>
+                                    <Link to="/admin/plant-maintenance" className="navbar-link flex items-center space-x-1">
+                                        <Wrench size={18} />
+                                        <span>Equipment</span>
+                                    </Link>
+                                    <Link to="/admin/renewable-energy" className="navbar-link flex items-center space-x-1">
+                                        <Zap size={18} />
+                                        <span>Renewable</span>
                                     </Link>
 
                                     <Link to="/admin/orders" className="navbar-link flex items-center space-x-1">
@@ -165,6 +173,20 @@ const Navbar = () => {
                                     onClick={() => setIsOpen(false)}
                                 >
                                     Transport
+                                </Link>
+                                <Link
+                                    to="/admin/plant-maintenance"
+                                    className="block px-4 py-2 rounded-lg hover:bg-white/10 transition-colors"
+                                    onClick={() => setIsOpen(false)}
+                                >
+                                    Equipment
+                                </Link>
+                                <Link
+                                    to="/admin/renewable-energy"
+                                    className="block px-4 py-2 rounded-lg hover:bg-white/10 transition-colors"
+                                    onClick={() => setIsOpen(false)}
+                                >
+                                    Renewable
                                 </Link>
                                 <Link
                                     to="/storage"
