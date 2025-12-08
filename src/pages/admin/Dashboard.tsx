@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Factory, Zap, DollarSign, Battery, Sun, Wind, Droplet, TrendingUp, Activity, MapPin, AlertCircle } from 'lucide-react';
+import { Factory, Zap, DollarSign, Sun, Wind, Droplet, TrendingUp, Activity, MapPin, AlertCircle } from 'lucide-react';
 
 interface PlantData {
     plant_id: string;
     plant_name: string;
-    location: string;
+    location: string | { city?: string; state?: string };
     weather: any;
     energy_output: any;
     profit_prediction: any;
@@ -236,27 +236,25 @@ const Dashboard = () => {
                                     <div className="space-y-2 text-sm">
                                         <div className="flex justify-between">
                                             <span className="text-gray-600 dark:text-gray-400">H₂ Production:</span>
-                                            <span className="font-bold">{plant.profit_prediction?.h2_production_kg?.toFixed(0)} kg</span>
+                                            <span className="font-bold">{plant.profit_prediction?.h2_production_kg?.toLocaleString(undefined, { maximumFractionDigits: 0 })} kg</span>
                                         </div>
                                         <div className="flex justify-between">
                                             <span className="text-gray-600 dark:text-gray-400">Daily Profit:</span>
-                                            <span className="font-bold text-green-600">${plant.profit_prediction?.daily_profit?.toLocaleString()}</span>
+                                            <span className={`font-bold ${(plant.profit_prediction?.daily_profit || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                ${plant.profit_prediction?.daily_profit?.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                            </span>
                                         </div>
                                         <div className="flex justify-between">
-                                            <span className="text-gray-600 dark:text-gray-400">Monthly:</span>
-                                            <span className="font-bold">${plant.profit_prediction?.monthly_profit?.toLocaleString()}</span>
+                                            <span className="text-gray-600 dark:text-gray-400">O₂ Produced:</span>
+                                            <span className="font-bold">{plant.profit_prediction?.breakdown?.oxygen_produced_kg?.toLocaleString(undefined, { maximumFractionDigits: 0 })} kg</span>
                                         </div>
                                         <div className="flex justify-between">
-                                            <span className="text-gray-600 dark:text-gray-400">Margin:</span>
-                                            <span className="font-bold">{plant.profit_prediction?.profit_margin}%</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-gray-600 dark:text-gray-400">ROI:</span>
-                                            <span className="font-bold text-purple-600">{plant.profit_prediction?.roi}%</span>
+                                            <span className="text-gray-600 dark:text-gray-400">Efficiency:</span>
+                                            <span className="font-bold text-blue-500">{plant.profit_prediction?.efficiency_data?.electrolyzer_efficiency || plant.profit_prediction?.breakdown?.efficiency || '—'}%</span>
                                         </div>
                                         <div className="flex justify-between">
                                             <span className="text-gray-600 dark:text-gray-400">Model:</span>
-                                            <span className="font-bold">LSTM</span>
+                                            <span className="font-bold text-purple-500">{plant.profit_prediction?.model_type || 'Physics-Based'}</span>
                                         </div>
                                     </div>
                                 </div>
