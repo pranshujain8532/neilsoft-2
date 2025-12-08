@@ -1,0 +1,300 @@
+// Auto-refresh every 10 seconds
+const interval = setInterval(() => {
+    activePlants: 3,
+        efficiency: 82 + Math.random() * 8,
+            energySources: {
+        solar: {
+            installed: 80,
+                current: weather ? (weather.solar_irradiance / 1000 * 80 * 0.18).toFixed(1) : (65 + Math.random() * 10),
+                    efficiency: 0.18,
+        },
+        wind: {
+            installed: 50,
+                current: weather ? Math.min(50, (Math.pow(weather.wind_speed / 10, 3) * 50 * 0.4)).toFixed(1) : (38 + Math.random() * 8),
+                    turbines: 10,
+        },
+        hydro: {
+            installed: 20,
+                current: (17 + Math.random() * 3).toFixed(1),
+                    flowRate: 45 + Math.random() * 10,
+        },
+    },
+};
+
+
+// Calculate dynamic energy mix based on current output
+const totalCurrentOutput = parseFloat(data.energySources.solar.current) +
+    parseFloat(data.energySources.wind.current) +
+    parseFloat(data.energySources.hydro.current);
+
+const currentEnergyMix = {
+    solar: (parseFloat(data.energySources.solar.current) / totalCurrentOutput * 100).toFixed(1),
+    wind: (parseFloat(data.energySources.wind.current) / totalCurrentOutput * 100).toFixed(1),
+    hydro: (parseFloat(data.energySources.hydro.current) / totalCurrentOutput * 100).toFixed(1),
+};
+
+// Production data for chart
+const productionData = Array.from({ length: 24 }, (_, i) => ({
+    hour: `${i}:00`,
+    hydrogen: Math.floor(Math.random() * 100) + 50,
+}));
+
+// Energy mix data for pie chart
+const energyMixData = [
+    { name: 'Solar', value: parseFloat(currentEnergyMix.solar), color: '#fbbf24' },
+    { name: 'Wind', value: parseFloat(currentEnergyMix.wind), color: '#06b6d4' },
+    { name: 'Hydro', value: parseFloat(currentEnergyMix.hydro), color: '#3b82f6' },
+];
+
+useEffect(() => {
+    setTimeout(() => setLoading(false), 500);
+}, []);
+
+if (loading) {
+    return (
+        <div className="flex items-center justify-center min-h-screen">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-hydrogen-500" />
+        </div>
+    );
+}
+
+return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 dark:from-gray-900 dark:to-gray-800 section-padding">
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="max-w-7xl mx-auto"
+        >
+            {/* Header */}
+            <div className="mb-8">
+                <h1 className="text-4xl font-bold gradient-text mb-2">Production Dashboard</h1>
+                <p className="text-gray-600 dark:text-gray-400">Real-time monitoring of hydrogen production and energy systems</p>
+            </div>
+
+            {/* Key Metrics Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <MetricCard
+                    title="Total Production"
+                    value={`${data.totalProduction} kg`}
+                    change="+12%"
+                    icon={<Zap className="text-hydrogen-500" />}
+                    positive={true}
+                />
+                <MetricCard
+                    title="Current LCOH"
+                    value={`$${data.lcoh}/kg`}
+                    change="-5%"
+                    icon={<DollarSign className="text-green-500" />}
+                    positive={true}
+                />
+                <MetricCard
+                    title="Total Energy"
+                    value={`${data.totalEnergyCapacity} MW`}
+                    change="+8%"
+                    icon={<Battery className="text-blue-500" />}
+                    positive={true}
+                />
+                <MetricCard
+                    title="Active Plants"
+                    value={data.activePlants.toString()}
+                    change="0"
+                    icon={<Factory className="text-purple-500" />}
+                    positive={true}
+                />
+            </div>
+
+            {/* Multi-Energy Sources Display - Real-Time */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                {/* Solar Energy */}
+                <EnergyCard
+                    type="Solar"
+                    icon={<Sun className="w-6 h-6 text-yellow-500" />}
+                    color="yellow"
+                    current={parseFloat(data.energySources.solar.current)}
+                    installed={data.energySources.solar.installed}
+                    efficiency={(data.energySources.solar.efficiency * 100).toFixed(1)}
+                    contribution={currentEnergyMix.solar}
+                    extra={weather ? `${weather.solar_irradiance?.toFixed(0)} W/m²` : '950 W/m²'}
+                    extraLabel="Irradiance"
+                />
+
+                {/* Wind Energy */}
+                <EnergyCard
+                    type="Wind"
+                    icon={<Wind className="w-6 h-6 text-cyan-500" />}
+                    color="cyan"
+                    current={parseFloat(data.energySources.wind.current)}
+                    installed={data.energySources.wind.installed}
+                    efficiency={data.energySources.wind.turbines.toString()}
+                    contribution={currentEnergyMix.wind}
+                    extra={weather ? `${weather.wind_speed?.toFixed(1)} m/s` : '12 m/s'}
+                    extraLabel="Wind Speed"
+                    efficiencyLabel="Turbines"
+                />
+
+                {/* Hydro Energy */}
+                <EnergyCard
+                    type="Hydro"
+                    icon={<Droplet className="w-6 h-6 text-blue-500" />}
+                    color="blue"
+                    current={parseFloat(data.energySources.hydro.current)}
+                    installed={data.energySources.hydro.installed}
+                    efficiency={data.energySources.hydro.flowRate.toFixed(1)}
+                    contribution={currentEnergyMix.hydro}
+                    extra="85%"
+                    extraLabel="Efficiency"
+                    efficiencyLabel="Flow (m³/s)"
+                />
+            </div>
+
+            {/* Charts Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Production Chart */}
+                <div className="card-glass p-6">
+                    <h3 className="text-xl font-semibold mb-4">Daily Production Trend</h3>
+                    <ResponsiveContainer width="100%" height={300}>
+                        <LineChart data={productionData}>
+                            <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                            <XAxis dataKey="hour" />
+                            <YAxis />
+                            <Tooltip />
+                            <Legend />
+                            <Line type="monotone" dataKey="hydrogen" stroke="#1890ff" strokeWidth={2} name="H₂ Production (kg)" />
+                        </LineChart>
+                    </ResponsiveContainer>
+                </div>
+
+                {/* Energy Mix Pie Chart */}
+                <div className="card-glass p-6">
+                    <h3 className="text-xl font-semibold mb-4">Current Energy Mix</h3>
+                    <ResponsiveContainer width="100%" height={300}>
+                        <PieChart>
+                            <Pie
+                                data={energyMixData}
+                                cx="50%"
+                                cy="50%"
+                                labelLine={false}
+                                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                                outerRadius={100}
+                                fill="#8884d8"
+                                dataKey="value"
+                            >
+                                {energyMixData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={entry.color} />
+                                ))}
+                            </Pie>
+                            <Tooltip />
+                        </PieChart>
+                    </ResponsiveContainer>
+                </div>
+            </div>
+        </motion.div>
+    </div>
+);
+};
+
+interface MetricCardProps {
+    title: string;
+    value: string;
+    change: string;
+    icon: React.ReactNode;
+    positive: boolean;
+}
+
+const MetricCard = ({ title, value, change, icon, positive }: MetricCardProps) => (
+    <motion.div whileHover={{ scale: 1.02 }} className="card-glass p-6">
+        <div className="flex items-start justify-between mb-4">
+            <div className="p-3 bg-gradient-to-br from-hydrogen-400 to-hydrogen-600 rounded-lg">
+                {icon}
+            </div>
+            <span className={`text-sm font-medium ${positive && change !== '0' ? 'text-green-500' : 'text-gray-500'}`}>
+                {change !== '0' && change}
+            </span>
+        </div>
+        <h3 className="text-gray-600 dark:text-gray-300 text-sm mb-1">{title}</h3>
+        <p className="text-2xl font-bold">{value}</p>
+    </motion.div>
+);
+
+interface EnergyCardProps {
+    type: string;
+    icon: React.ReactNode;
+    color: string;
+    current: number;
+    installed: number;
+    efficiency: string;
+    contribution: string;
+    extra: string;
+    extraLabel: string;
+    efficiencyLabel?: string;
+}
+
+const EnergyCard = ({ type, icon, color, current, installed, efficiency, contribution, extra, extraLabel, efficiencyLabel = "Efficiency" }: EnergyCardProps) => {
+    const colorClasses = {
+        yellow: 'border-yellow-500 bg-yellow-500/20',
+        cyan: 'border-cyan-500 bg-cyan-500/20',
+        blue: 'border-blue-500 bg-blue-500/20',
+    };
+
+    const progressColor = {
+        yellow: 'bg-yellow-500',
+        cyan: 'bg-cyan-500',
+        blue: 'bg-blue-500',
+    };
+
+    const textColor = {
+        yellow: 'text-yellow-600 dark:text-yellow-400',
+        cyan: 'text-cyan-600 dark:text-cyan-400',
+        blue: 'text-blue-600 dark:text-blue-400',
+    };
+
+    return (
+        <motion.div whileHover={{ scale: 1.02 }} className={`card-glass p-6 border-l-4 ${colorClasses[color as keyof typeof colorClasses]}`}>
+            <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-3">
+                    <div className={`p-3 ${colorClasses[color as keyof typeof colorClasses]} rounded-lg`}>
+                        {icon}
+                    </div>
+                    <div>
+                        <h3 className="font-semibold text-lg">{type} Power</h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">{type === 'Wind' ? `${efficiency} Turbines` : 'Array'}</p>
+                    </div>
+                </div>
+            </div>
+            <div className="space-y-3">
+                <div>
+                    <div className="flex justify-between text-sm mb-1">
+                        <span className="text-gray-600 dark:text-gray-400">Current Output</span>
+                        <span className="font-semibold">{current} MW</span>
+                    </div>
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                        <div
+                            className={`${progressColor[color as keyof typeof progressColor]} h-2 rounded-full transition-all duration-500`}
+                            style={{ width: `${(current / installed) * 100}%` }}
+                        />
+                    </div>
+                </div>
+                <div className="flex justify-between text-sm">
+                    <span className="text-gray-600 dark:text-gray-400">Installed Capacity</span>
+                    <span className="font-semibold">{installed} MW</span>
+                </div>
+                {type !== 'Wind' && (
+                    <div className="flex justify-between text-sm">
+                        <span className="text-gray-600 dark:text-gray-400">{efficiencyLabel}</span>
+                        <span className={`font-semibold ${textColor[color as keyof typeof textColor]}`}>{efficiency}{efficiencyLabel === "Efficiency" ? '%' : ''}</span>
+                    </div>
+                )}
+                <div className="flex justify-between text-sm">
+                    <span className="text-gray-600 dark:text-gray-400">{extraLabel}</span>
+                    <span className={`font-semibold ${textColor[color as keyof typeof textColor]}`}>{extra}</span>
+                </div>
+                <div className="flex justify-between text-sm pt-2 border-t border-gray-200 dark:border-gray-700">
+                    <span className="text-gray-600 dark:text-gray-400">Contribution</span>
+                    <span className={`font-semibold ${textColor[color as keyof typeof textColor]}`}>{contribution}%</span>
+                </div>
+            </div>
+        </motion.div>
+    );
+};
+
+export default Dashboard;

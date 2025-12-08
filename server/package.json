@@ -1,0 +1,42 @@
+{
+    "name": "green-hydrogen-backend",
+    "version": "1.0.0",
+    "type": "module",
+    "description": "Backend API for Green Hydrogen Platform",
+    "main": "dist/index.js",
+    "scripts": {
+        "dev": "tsx watch src/index.ts",
+        "build": "tsc",
+        "start": "node dist/index.js",
+        "test": "jest"
+    },
+    "dependencies": {
+        "express": "^4.21.1",
+        "mongoose": "^8.8.3",
+        "socket.io": "^4.8.1",
+        "jsonwebtoken": "^9.0.2",
+        "bcryptjs": "^2.4.3",
+        "cors": "^2.8.5",
+        "helmet": "^8.0.0",
+        "dotenv": "^16.4.5",
+        "express-rate-limit": "^7.4.1",
+        "express-validator": "^7.2.0",
+        "influx": "^5.9.3",
+        "mqtt": "^5.10.1",
+        "axios": "^1.7.7",
+        "web3": "^4.15.0",
+        "ethers": "^6.13.4",
+        "@hyperledger/fabric-gateway": "^1.7.0",
+        "winston": "^3.17.0"
+    },
+    "devDependencies": {
+        "@types/express": "^5.0.0",
+        "@types/node": "^22.9.3",
+        "@types/bcryptjs": "^2.4.6",
+        "@types/cors": "^2.8.17",
+        "@types/jsonwebtoken": "^9.0.7",
+        "tsx": "^4.19.2",
+        "typescript": "^5.6.3",
+        "jest": "^29.7.0"
+    }
+}

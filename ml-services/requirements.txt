@@ -1,0 +1,35 @@
+flask
+flask-cors
+python-dotenv
+scipy
+
+# Data Processing
+numpy
+pandas
+matplotlib
+seaborn
+
+# NLP for Chatbot
+transformers
+langchain
+sentence-transformers
+
+# Google Generative AI (for chatbot)
+google-generativeai
+
+# Utilities
+flask-socketio
+requests
+python-socketio
+eventlet
+
+# Testing
+pytest
+flasgger
+scikit-learn
+joblib
+shap
+
+# ML & Database
+supabase
+tensorflow
