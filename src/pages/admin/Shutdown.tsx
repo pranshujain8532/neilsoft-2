@@ -4,7 +4,7 @@ import {
     Shield, Zap, AlertTriangle, Play, Power,
     Thermometer, Gauge,
     Radio, Heart, Timer,
-    CheckCircle2, Waves, TrendingUp, Brain, Server, AlertCircle, Loader2
+    CheckCircle2, Waves, TrendingUp, Brain, Server, AlertCircle, Loader2, RotateCcw
 } from 'lucide-react';
 import {
     XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -170,6 +170,26 @@ const Shutdown = () => {
             const res = await fetch(`${ML_API_URL}/api/rhs-rrp/innovations/polarization/${plantId}`, { method: 'POST' });
             const result: ActionResult = await res.json();
             setActionResult(result);
+        } catch (e) {
+            setActionResult({ success: false, error: 'Network error. Check if ML service is running.' });
+        }
+        setActionLoading(null);
+    };
+
+    const resetToOperational = async () => {
+        setActionLoading('reset');
+        setActionResult(null);
+        try {
+            const res = await fetch(`${ML_API_URL}/api/rhs-rrp/control/reset-operational`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ plant_id: plantId })
+            });
+            const result: ActionResult = await res.json();
+            setActionResult(result);
+            if (result.success) {
+                await fetchDashboard();
+            }
         } catch (e) {
             setActionResult({ success: false, error: 'Network error. Check if ML service is running.' });
         }
@@ -360,6 +380,22 @@ const Shutdown = () => {
                                 {actionLoading === 'pulse' ? <Loader2 className="w-5 h-5 animate-spin" /> : <Waves className="w-5 h-5" />}
                                 {actionLoading === 'pulse' ? 'PULSING...' : 'ANTI-CORROSION PULSE'}
                             </motion.button>
+
+                            {/* Reset Button - only shows when in standby/recovery */}
+                            {isStandby && (
+                                <motion.button
+                                    onClick={resetToOperational}
+                                    disabled={actionLoading === 'reset'}
+                                    className="w-full py-3 px-6 bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-500 hover:to-slate-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl font-medium transition-all flex items-center justify-center gap-3 border border-slate-500"
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                >
+                                    {actionLoading === 'reset' ? <Loader2 className="w-5 h-5 animate-spin" /> : <RotateCcw className="w-5 h-5" />}
+                                    {actionLoading === 'reset' ? 'RESETTING...' : 'RESET TO OPERATIONAL'}
+                                </motion.button>
+                            )}
                         </div>
 
                         {/* Action Result Feedback */}

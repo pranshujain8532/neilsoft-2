@@ -89,6 +89,23 @@ def execute_rapid_inject():
         return jsonify(result), 400
 
 
+@rhs_rrp_bp.route('/control/reset-operational', methods=['POST'])
+def reset_to_operational():
+    """
+    Reset plant state to OPERATIONAL.
+    Clears standby mode and returns to normal operation.
+    """
+    data = request.json or {}
+    plant_id = data.get('plant_id')
+    
+    result = rhs_rrp_service.reset_to_operational(plant_id)
+    
+    if result.get('success'):
+        return jsonify(result)
+    else:
+        return jsonify(result), 400
+
+
 @rhs_rrp_bp.route('/innovations/polarization/<plant_id>', methods=['POST'])
 def trigger_polarization(plant_id):
     """

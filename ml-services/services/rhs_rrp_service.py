@@ -233,7 +233,62 @@ class RHSRRPService:
         
         return {'success': False, 'error': 'Database not connected'}
 
+    def reset_to_operational(self, plant_id: str) -> Dict:
+        """
+        Reset plant state to OPERATIONAL.
+        Used to exit standby/recovery mode and return to normal operation.
+        """
+        if not plant_id or plant_id == '123e4567-e89b-12d3-a456-426614174000':
+            plant_id = self._get_default_plant_id()
+            if not plant_id:
+                return {'success': False, 'error': 'No plants found in database'}
+        
+        logger.info(f"🔄 RESETTING TO OPERATIONAL for plant {plant_id}")
+        
+        # Update cache
+        self._state_cache[plant_id] = PlantState.OPERATIONAL
+        
+        if self.supabase:
+            try:
+                # Get current state for logging
+                current_state = self._get_current_state_from_db(plant_id) or 'UNKNOWN'
+                
+                # Log event
+                self.supabase.table('standby_events').insert({
+                    'plant_id': plant_id,
+                    'previous_state': current_state,
+                    'new_state': 'OPERATIONAL',
+                    'trigger_source': 'MANUAL',
+                    'failure_probability': 0.0,
+                    'notes': 'Manual reset to OPERATIONAL state'
+                }).execute()
+                
+                # Insert operational telemetry (normal values)
+                self.supabase.table('standby_telemetry').insert({
+                    'plant_id': plant_id,
+                    'membrane_resistance_ohm': 0.150,
+                    'stack_temperature_c': self.OPTIMAL_TEMP_C,
+                    'internal_pressure_bar': self.TARGET_HOLDING_PRESSURE_BAR,
+                    'protection_current_amps': 0.0,  # No protection current in operational
+                    'restart_readiness_index': 100.0
+                }).execute()
+                
+                return {
+                    'success': True,
+                    'action': 'RESET_TO_OPERATIONAL',
+                    'state': 'OPERATIONAL',
+                    'plant_id': plant_id,
+                    'message': 'System returned to OPERATIONAL state. Ready for normal production.',
+                    'timestamp': datetime.now().isoformat()
+                }
+            except Exception as e:
+                logger.error(f"Failed to reset to operational: {e}")
+                return {'success': False, 'error': str(e)}
+        
+        return {'success': False, 'error': 'Database not connected'}
+
     def activate_polarization_pulse(self, plant_id: str) -> Dict:
+
         """
         Execute Active Polarization pulse - anti-corrosion protection.
         Logs the pulse to database.
