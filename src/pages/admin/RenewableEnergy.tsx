@@ -66,26 +66,14 @@ interface EnergyBalance {
     }>;
 }
 
-interface Transaction {
-    id: string;
-    transaction_type: 'charge' | 'discharge' | 'overflow';
-    source: string;
-    energy_kwh: number;
-    recorded_at: string;
-}
+
 
 interface Plant {
     id: string;
     name: string;
 }
 
-interface SurplusData {
-    has_surplus: boolean;
-    surplus_kw: number;
-    dominant_source: string;
-    total_production_kw: number;
-    plant_capacity_kw: number;
-}
+
 
 interface SourceBreakdown {
     source_type: string;
@@ -182,16 +170,18 @@ interface GridRoutingData {
 const ML_API_URL = (import.meta as any).env?.VITE_ML_API_URL || 'http://localhost:5001';
 
 // Helper to format large kWh values
-const formatEnergy = (kwh: number): string => {
-    if (kwh >= 1000000) return `${(kwh / 1000000).toFixed(1)} GWh`;
-    if (kwh >= 1000) return `${(kwh / 1000).toFixed(1)} MWh`;
-    return `${kwh.toFixed(1)} kWh`;
+const formatEnergy = (kwh: number | undefined | null): string => {
+    const val = kwh ?? 0;
+    if (val >= 1000000) return `${(val / 1000000).toFixed(1)} GWh`;
+    if (val >= 1000) return `${(val / 1000).toFixed(1)} MWh`;
+    return `${val.toFixed(1)} kWh`;
 };
 
 // Format power in kW
-const formatPower = (kw: number): string => {
-    if (kw >= 1000) return `${(kw / 1000).toFixed(1)} MW`;
-    return `${kw.toFixed(1)} kW`;
+const formatPower = (kw: number | undefined | null): string => {
+    const val = kw ?? 0;
+    if (val >= 1000) return `${(val / 1000).toFixed(1)} MW`;
+    return `${val.toFixed(1)} kW`;
 };
 
 const RenewableEnergy = () => {
@@ -209,8 +199,7 @@ const RenewableEnergy = () => {
     const [energyBalance, setEnergyBalance] = useState<EnergyBalance | null>(null);
     const [totals, setTotals] = useState<any>({});
 
-    // Smart Surplus Management states
-    const [surplusData, setSurplusData] = useState<SurplusData | null>(null);
+
     const [sourceBreakdown, setSourceBreakdown] = useState<SourceBreakdown[]>([]);
     const [overflowData, setOverflowData] = useState<OverflowData | null>(null);
 
@@ -293,15 +282,7 @@ const RenewableEnergy = () => {
             if (data.realtime) {
                 setRealtimeEnergy(data.realtime);
 
-                // Update surplus data from realtime
-                const rt = data.realtime;
-                setSurplusData({
-                    has_surplus: rt.total_power_kw > rt.total_capacity_kw,
-                    surplus_kw: Math.max(0, rt.total_power_kw - rt.total_capacity_kw),
-                    dominant_source: rt.dominant_source,
-                    total_production_kw: rt.total_power_kw,
-                    plant_capacity_kw: rt.total_capacity_kw
-                });
+
             }
 
             // Set weather data
@@ -804,7 +785,7 @@ const RenewableEnergy = () => {
                                         style={{ width: `${battery.charge_percent}%` }}
                                     />
                                     <span className="absolute inset-0 flex items-center justify-center text-white font-bold text-sm">
-                                        {battery.charge_percent.toFixed(1)}%
+                                        {((battery?.charge_percent) ?? 0).toFixed(1)}%
                                     </span>
                                 </div>
 

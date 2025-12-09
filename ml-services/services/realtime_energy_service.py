@@ -319,34 +319,82 @@ class RealtimeEnergyService:
         }
     
     def _get_plant_capacities(self, plant_id: str) -> Dict:
-        """Get energy source capacities from DB"""
+        """
+        Get energy source capacities from DB.
+        Prioritizes 'energy_sources' table, falls back to 'plants' table capacity + type.
+        """
+        # Default fallback only if DB fails completely
         default_capacities = {'solar': 50, 'wind': 30, 'hydro': 20}
         
         if not self.supabase:
             return default_capacities
         
         try:
+            # 1. Try energy_sources table first (detailed configuration)
             response = self.supabase.table('energy_sources') \
                 .select('source_type, capacity_kw') \
                 .eq('plant_id', plant_id) \
                 .execute()
             
-            if response.data:
-                capacities = default_capacities.copy()
+            if response.data and len(response.data) > 0:
+                capacities = {'solar': 0, 'wind': 0, 'hydro': 0}
+                has_data = False
                 for src in response.data:
-                    src_type = src.get('source_type', '')
-                    capacity = src.get('capacity_kw', 0) or 0
+                    src_type = src.get('source_type', '').lower()
+                    capacity = float(src.get('capacity_kw', 0) or 0)
+                    if capacity > 0: has_data = True
                     
-                    if 'solar' in src_type:
-                        capacities['solar'] = capacity
-                    elif 'wind' in src_type:
-                        capacities['wind'] = capacity
-                    elif 'hydro' in src_type:
-                        capacities['hydro'] = capacity
+                    if 'solar' in src_type: capacities['solar'] += capacity
+                    elif 'wind' in src_type: capacities['wind'] += capacity
+                    elif 'hydro' in src_type: capacities['hydro'] += capacity
                 
-                return capacities
+                if has_data:
+                    return capacities
             
+            # 2. Fallback: Fetch from 'plants' table directly
+            # This handles cases where plant is added but energy_sources not populated
+            plant_res = self.supabase.table('plants') \
+                .select('capacity, location, name') \
+                .eq('id', plant_id) \
+                .single() \
+                .execute()
+            
+            if plant_res.data:
+                p_data = plant_res.data
+                total_capacity = float(p_data.get('capacity', 0) or 100)
+                
+                # Determine type from location JSONB or name
+                plant_type = 'hybrid'  # Default
+                location = p_data.get('location')
+                
+                if isinstance(location, dict) and 'evaluation' in location:
+                    # Use recommended type from site evaluation if available
+                    plant_type = location['evaluation'].get('recommended_type', 'hybrid').lower()
+                elif p_data.get('name'):
+                    # Infer from name
+                    name = p_data.get('name').lower()
+                    if 'solar' in name and 'wind' not in name: plant_type = 'solar'
+                    elif 'wind' in name and 'solar' not in name: plant_type = 'wind'
+                    elif 'hydro' in name: plant_type = 'hydro'
+                    
+                # Distribute capacity based on type
+                if 'solar' in plant_type and 'wind' not in plant_type and 'hybrid' not in plant_type:
+                     return {'solar': total_capacity, 'wind': 0, 'hydro': 0}
+                elif 'wind' in plant_type and 'solar' not in plant_type and 'hybrid' not in plant_type:
+                     return {'solar': 0, 'wind': total_capacity, 'hydro': 0}
+                elif 'hydro' in plant_type:
+                     return {'solar': 0, 'wind': 0, 'hydro': total_capacity}
+                else:
+                    # Hybrid: Distribute based on a standard mix
+                    # 40% Solar, 40% Wind, 20% Hydro
+                    return {
+                        'solar': total_capacity * 0.4,
+                        'wind': total_capacity * 0.4,
+                        'hydro': total_capacity * 0.2
+                    }
+                    
             return default_capacities
+            
         except Exception as e:
             print(f"[WARN] Could not get capacities: {e}")
             return default_capacities
