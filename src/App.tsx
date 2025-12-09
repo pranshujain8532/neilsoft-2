@@ -37,6 +37,7 @@ import OrderHistory from './pages/customer/OrderHistory';
 
 // Layout
 import Navbar from './components/layout/Navbar';
+import AlertPopup from './components/AlertPopup';
 
 function App() {
     useTheme();
@@ -55,6 +56,7 @@ function App() {
                         <ProtectedRoute requireAdmin>
                             <>
                                 <Navbar />
+                                <AlertPopup />
                                 <Routes>
                                     <Route path="dashboard" element={<AdminDashboard />} />
                                     <Route path="plant-monitoring" element={<PlantMonitoring />} />

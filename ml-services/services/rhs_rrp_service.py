@@ -150,6 +150,9 @@ class RHSRRPService:
                     'restart_readiness_index': 95.0
                 }).execute()
                 
+                # Send alert to admin
+                self._send_hot_standby_alert(plant_id, trigger_source, failure_probability)
+                
                 return {
                     'success': True,
                     'action': 'HOT_STANDBY_TRIGGERED',
@@ -170,6 +173,23 @@ class RHSRRPService:
                 return {'success': False, 'error': str(e)}
         
         return {'success': False, 'error': 'Database not connected'}
+    
+    def _send_hot_standby_alert(self, plant_id: str, trigger_source: str, failure_prob: float):
+        """Send alert when hot standby is activated"""
+        try:
+            from services.alert_service import alert_service
+            # Get plant name
+            plant_name = "Unknown Plant"
+            if self.supabase:
+                res = self.supabase.table('plants').select('name').eq('id', plant_id).single().execute()
+                if res.data:
+                    plant_name = res.data.get('name', plant_name)
+            
+            alert_service.alert_hot_standby_activated(
+                plant_id, plant_name, trigger_source, failure_prob
+            )
+        except Exception as e:
+            logger.warning(f"Failed to send hot standby alert: {e}")
 
     def trigger_rapid_inject(self, plant_id: str) -> Dict:
         """

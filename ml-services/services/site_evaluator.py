@@ -629,111 +629,714 @@ class SiteEvaluator:
         return R * c
     
     # =========================================================================
-    # MAIN EVALUATION & DECISION MATRIX
+    # BIOMASS & MSW EVALUATION (Module A)
+    # =========================================================================
+    
+    def evaluate_biomass_msw(self, lat: float, lon: float) -> Dict:
+        """
+        Evaluate Biomass and MSW (Municipal Solid Waste) potential
+        
+        Logic:
+        - MSW Path: If Urban_Density > High AND Traffic_Index > High
+          → Calculate MSW Score (local waste collection feasibility)
+        - Biomass Path: If Urban_Density > High AND Traffic_Index < Medium
+          → Calculate Biomass Score (transport from neighboring states)
+        
+        Returns:
+            Dict with score, source_type (MSW/BIOMASS), and reasoning
+        """
+        result = {
+            'score': 0,
+            'source_type': 'NONE',
+            'urban_density': 0,
+            'traffic_index': 0,
+            'reasoning': '',
+            'conditions': [],
+            'grade': 'Poor'
+        }
+        
+        try:
+            # Get urban density
+            urban_density = self._get_urban_density(lat, lon)
+            traffic_index = self._get_traffic_density(lat, lon)
+            
+            result['urban_density'] = urban_density
+            result['traffic_index'] = traffic_index
+            
+            result['conditions'].append({
+                'metric': 'Urban Density',
+                'value': f"{urban_density:.0f}%",
+                'status': 'good' if urban_density > 60 else 'fair' if urban_density > 30 else 'poor'
+            })
+            
+            result['conditions'].append({
+                'metric': 'Traffic Index',
+                'value': f"{traffic_index:.0f}%",
+                'status': 'good' if traffic_index < 50 else 'fair' if traffic_index < 70 else 'poor'
+            })
+            
+            # Decision logic
+            if urban_density > 70 and traffic_index > 60:
+                # MSW Path - High urban density + congested traffic favors local waste
+                msw_score = self._calculate_msw_score(lat, lon, urban_density)
+                result['score'] = msw_score
+                result['source_type'] = 'MSW'
+                result['reasoning'] = f'High urban density ({urban_density:.0f}%) with congested traffic ({traffic_index:.0f}%) favors Municipal Solid Waste collection.'
+                
+                result['conditions'].append({
+                    'metric': 'Source Selected',
+                    'value': 'MSW (Municipal Solid Waste)',
+                    'status': 'good' if msw_score > 60 else 'fair'
+                })
+                
+            elif urban_density > 50 and traffic_index < 40:
+                # Biomass Path - Moderate density + low traffic favors transport
+                biomass_score = self._calculate_biomass_score(lat, lon)
+                result['score'] = biomass_score
+                result['source_type'] = 'BIOMASS'
+                result['reasoning'] = f'Moderate density ({urban_density:.0f}%) with good logistics ({traffic_index:.0f}% traffic) favors Biomass transport from agricultural regions.'
+                
+                result['conditions'].append({
+                    'metric': 'Source Selected',
+                    'value': 'Biomass (Agricultural)',
+                    'status': 'good' if biomass_score > 60 else 'fair'
+                })
+                
+            else:
+                # Hybrid evaluation - compare both
+                msw_score = self._calculate_msw_score(lat, lon, urban_density)
+                biomass_score = self._calculate_biomass_score(lat, lon)
+                
+                if msw_score >= biomass_score:
+                    result['score'] = msw_score
+                    result['source_type'] = 'MSW'
+                    result['reasoning'] = f'MSW selected over Biomass (Score: {msw_score:.0f} vs {biomass_score:.0f}) based on location characteristics.'
+                else:
+                    result['score'] = biomass_score
+                    result['source_type'] = 'BIOMASS'
+                    result['reasoning'] = f'Biomass selected over MSW (Score: {biomass_score:.0f} vs {msw_score:.0f}) based on agricultural proximity.'
+            
+            # Set grade
+            if result['score'] >= 70:
+                result['grade'] = 'Excellent'
+            elif result['score'] >= 50:
+                result['grade'] = 'Good'
+            elif result['score'] >= 30:
+                result['grade'] = 'Fair'
+            else:
+                result['grade'] = 'Poor'
+                
+        except Exception as e:
+            print(f"[ERROR] Biomass/MSW evaluation failed: {e}")
+            result['reasoning'] = f"Unable to evaluate Biomass/MSW potential: {str(e)}"
+        
+        return result
+    
+    def _get_urban_density(self, lat: float, lon: float) -> float:
+        """Calculate urban density score (0-100) based on location"""
+        try:
+            # Use Google Places to estimate urban density
+            if self.google_api_key:
+                url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
+                params = {
+                    'location': f"{lat},{lon}",
+                    'radius': 5000,
+                    'key': self.google_api_key
+                }
+                response = requests.get(url, params=params, timeout=10)
+                if response.status_code == 200:
+                    data = response.json()
+                    place_count = len(data.get('results', []))
+                    # More places = higher density (max ~20 results)
+                    return min(100, place_count * 5)
+            
+            # Fallback: Major Indian city proximity estimation
+            major_cities = [
+                (19.076, 72.877, 'Mumbai', 95),
+                (28.613, 77.209, 'Delhi', 90),
+                (12.972, 77.594, 'Bangalore', 85),
+                (22.572, 88.363, 'Kolkata', 80),
+                (13.082, 80.270, 'Chennai', 80),
+                (17.385, 78.486, 'Hyderabad', 75),
+                (23.022, 72.571, 'Ahmedabad', 70),
+                (18.520, 73.856, 'Pune', 65),
+            ]
+            
+            min_distance = float('inf')
+            density = 30  # Rural default
+            
+            for city_lat, city_lon, name, city_density in major_cities:
+                dist = self._haversine_distance(lat, lon, city_lat, city_lon)
+                if dist < min_distance:
+                    min_distance = dist
+                    if dist < 50:
+                        density = city_density * (1 - dist/100)
+                    elif dist < 100:
+                        density = city_density * 0.5
+            
+            return max(20, min(100, density))
+            
+        except Exception as e:
+            print(f"[WARN] Urban density estimation failed: {e}")
+            return 50  # Default moderate
+    
+    def _get_traffic_density(self, lat: float, lon: float) -> float:
+        """Get traffic congestion index (0-100, higher = more congested)"""
+        try:
+            # Note: Would use TomTom or Google Routes API in production
+            # Using correlation with urban density for demo
+            urban = self._get_urban_density(lat, lon)
+            
+            # Traffic typically correlates with urban density but with variation
+            import random
+            variation = random.uniform(-10, 10)
+            traffic = urban * 0.8 + variation
+            
+            return max(0, min(100, traffic))
+            
+        except Exception as e:
+            print(f"[WARN] Traffic density estimation failed: {e}")
+            return 50
+    
+    def _calculate_msw_score(self, lat: float, lon: float, urban_density: float = None) -> float:
+        """Calculate MSW collection feasibility score"""
+        if urban_density is None:
+            urban_density = self._get_urban_density(lat, lon)
+        
+        # MSW is more viable in high-density urban areas
+        base_score = urban_density * 0.6
+        
+        # Bonus for metropolitan areas
+        if urban_density > 80:
+            base_score += 20
+        elif urban_density > 60:
+            base_score += 10
+        
+        return min(100, base_score)
+    
+    def _calculate_biomass_score(self, lat: float, lon: float) -> float:
+        """Calculate biomass transport viability score"""
+        # Agricultural regions in India
+        agricultural_zones = [
+            (29.0, 76.0, 'Punjab', 90),
+            (26.8, 80.9, 'UP', 85),
+            (22.5, 88.3, 'West Bengal', 80),
+            (20.0, 77.0, 'Maharashtra', 75),
+            (15.0, 76.0, 'Karnataka', 70),
+        ]
+        
+        max_score = 30  # Default low
+        
+        for zone_lat, zone_lon, name, zone_score in agricultural_zones:
+            dist = self._haversine_distance(lat, lon, zone_lat, zone_lon)
+            if dist < 200:  # Within 200km
+                proximity_score = zone_score * (1 - dist/400)
+                max_score = max(max_score, proximity_score)
+        
+        return min(100, max_score)
+    
+    # =========================================================================
+    # GRID WHEELING / VIRTUAL PPA EVALUATION (Module B)
+    # =========================================================================
+    
+    def evaluate_grid_wheeling(self, lat: float, lon: float) -> Dict:
+        """
+        Evaluate economic viability of grid wheeling / Virtual PPA
+        
+        Logic:
+        Score = 100 × (1 - (Transmission_Loss + Wheeling_Charges))
+        
+        Returns:
+            Dict with score, wheeling charges, transmission loss, and reasoning
+        """
+        result = {
+            'score': 0,
+            'wheeling_charge_per_kwh': 0,
+            'transmission_loss_percent': 0,
+            'grid_stability_index': 0,
+            'state': 'Unknown',
+            'reasoning': '',
+            'conditions': [],
+            'grade': 'Poor'
+        }
+        
+        try:
+            # Get state from coordinates
+            state = self._get_state_from_coords(lat, lon)
+            result['state'] = state
+            
+            # State-wise wheeling charges (₹/kWh) - based on Indian regulations
+            wheeling_charges = {
+                'Gujarat': 1.10,
+                'Rajasthan': 0.95,
+                'Maharashtra': 1.25,
+                'Tamil Nadu': 1.35,
+                'Karnataka': 1.20,
+                'Andhra Pradesh': 1.15,
+                'Telangana': 1.18,
+                'Madhya Pradesh': 1.05,
+                'Punjab': 1.30,
+                'Haryana': 1.28,
+                'default': 1.30
+            }
+            
+            charge = wheeling_charges.get(state, wheeling_charges['default'])
+            result['wheeling_charge_per_kwh'] = charge
+            
+            # Transmission loss estimate (typically 3-8% in India)
+            transmission_loss = self._get_transmission_loss(lat, lon)
+            result['transmission_loss_percent'] = transmission_loss
+            
+            # Grid stability index (0-100)
+            grid_stability = self._get_grid_stability(lat, lon, state)
+            result['grid_stability_index'] = grid_stability
+            
+            result['conditions'].append({
+                'metric': 'State',
+                'value': state,
+                'status': 'good'
+            })
+            
+            result['conditions'].append({
+                'metric': 'Wheeling Charge',
+                'value': f"₹{charge:.2f}/kWh",
+                'status': 'good' if charge < 1.15 else 'fair' if charge < 1.30 else 'poor'
+            })
+            
+            result['conditions'].append({
+                'metric': 'Transmission Loss',
+                'value': f"{transmission_loss:.1f}%",
+                'status': 'good' if transmission_loss < 5 else 'fair' if transmission_loss < 7 else 'poor'
+            })
+            
+            result['conditions'].append({
+                'metric': 'Grid Stability',
+                'value': f"{grid_stability:.0f}%",
+                'status': 'good' if grid_stability > 80 else 'fair' if grid_stability > 60 else 'poor'
+            })
+            
+            # Calculate score: 100 × (1 - (normalized_charge + loss)) × stability
+            cost_factor = (charge / 2.0) + (transmission_loss / 100)  # Normalize
+            score = 100 * (1 - cost_factor) * (grid_stability / 100)
+            result['score'] = max(0, min(100, score))
+            
+            # Determine grade
+            if result['score'] >= 70:
+                result['grade'] = 'Excellent'
+                result['reasoning'] = f'Grid wheeling highly viable in {state} with low charges (₹{charge}/kWh) and stable grid ({grid_stability}%).'
+            elif result['score'] >= 50:
+                result['grade'] = 'Good'
+                result['reasoning'] = f'Grid wheeling viable in {state}. Consider Virtual PPA for remote renewable generation.'
+            elif result['score'] >= 30:
+                result['grade'] = 'Fair'
+                result['reasoning'] = f'Marginal grid wheeling viability. High charges (₹{charge}/kWh) or transmission losses ({transmission_loss}%) reduce economics.'
+            else:
+                result['grade'] = 'Poor'
+                result['reasoning'] = f'Grid wheeling not recommended. Combined losses and charges exceed viable threshold.'
+                
+        except Exception as e:
+            print(f"[ERROR] Grid wheeling evaluation failed: {e}")
+            result['reasoning'] = f"Unable to evaluate grid wheeling: {str(e)}"
+        
+        return result
+    
+    def _get_state_from_coords(self, lat: float, lon: float) -> str:
+        """Get Indian state from coordinates using reverse geocoding"""
+        try:
+            if self.google_api_key:
+                url = "https://maps.googleapis.com/maps/api/geocode/json"
+                params = {
+                    'latlng': f"{lat},{lon}",
+                    'key': self.google_api_key
+                }
+                response = requests.get(url, params=params, timeout=10)
+                if response.status_code == 200:
+                    data = response.json()
+                    for result in data.get('results', []):
+                        for component in result.get('address_components', []):
+                            if 'administrative_area_level_1' in component.get('types', []):
+                                return component.get('long_name', 'Unknown')
+            
+            # Fallback: Approximate based on coordinates
+            if lon < 74 and lat > 22:
+                return 'Gujarat'
+            elif lon > 74 and lon < 78 and lat > 25:
+                return 'Rajasthan'
+            elif lon > 72 and lon < 80 and lat > 16 and lat < 22:
+                return 'Maharashtra'
+            elif lon > 76 and lon < 80 and lat > 12 and lat < 16:
+                return 'Karnataka'
+            elif lon > 78 and lon < 85 and lat > 12 and lat < 16:
+                return 'Tamil Nadu'
+            else:
+                return 'Unknown State'
+                
+        except Exception as e:
+            print(f"[WARN] State detection failed: {e}")
+            return 'Unknown'
+    
+    def _get_transmission_loss(self, lat: float, lon: float) -> float:
+        """Estimate transmission loss based on grid infrastructure"""
+        # Simplified model: higher losses in remote areas
+        urban_density = self._get_urban_density(lat, lon)
+        
+        # Urban areas have better grid infrastructure
+        if urban_density > 70:
+            return 3.5 + (100 - urban_density) * 0.02
+        else:
+            return 5.0 + (70 - urban_density) * 0.05
+    
+    def _get_grid_stability(self, lat: float, lon: float, state: str = None) -> float:
+        """Get grid stability index (0-100)"""
+        # State-wise grid stability (higher = more stable)
+        stability_map = {
+            'Gujarat': 92,
+            'Maharashtra': 88,
+            'Karnataka': 85,
+            'Tamil Nadu': 87,
+            'Rajasthan': 80,
+            'Madhya Pradesh': 75,
+            'Punjab': 82,
+            'Haryana': 80,
+            'Andhra Pradesh': 78,
+            'Telangana': 82,
+            'default': 75
+        }
+        
+        if state:
+            return stability_map.get(state, stability_map['default'])
+        return 75
+    
+    # =========================================================================
+    # GEOTHERMAL EVALUATION (Module C)
+    # =========================================================================
+    
+    def evaluate_geothermal(self, lat: float, lon: float) -> Dict:
+        """
+        Evaluate geothermal potential for baseload power
+        
+        Critical for 24/7 Electrolyzer efficiency
+        
+        Logic:
+        - If Heat_Flow > 80 mW/m² → High potential
+        - If Heat_Flow 50-80 → Moderate  
+        - If Heat_Flow < 50 → Low potential
+        
+        Returns:
+            Dict with score, heat_flow, baseload capability, and reasoning
+        """
+        result = {
+            'score': 0,
+            'heat_flow_mw_m2': 0,
+            'rating': 'LOW',
+            'nearest_zone': None,
+            'distance_to_zone_km': None,
+            'baseload_capable': False,
+            'reasoning': '',
+            'conditions': [],
+            'grade': 'Poor'
+        }
+        
+        try:
+            # India geothermal zones with heat flow data (mW/m²)
+            geothermal_zones = [
+                {'name': 'Puga Valley, Ladakh', 'lat': 33.23, 'lon': 78.31, 'heat_flow': 150},
+                {'name': 'Chumathang, Ladakh', 'lat': 33.38, 'lon': 78.38, 'heat_flow': 130},
+                {'name': 'Tattapani, Chhattisgarh', 'lat': 23.43, 'lon': 81.31, 'heat_flow': 100},
+                {'name': 'Manikaran, HP', 'lat': 32.03, 'lon': 77.35, 'heat_flow': 90},
+                {'name': 'Surajkund, Jharkhand', 'lat': 24.12, 'lon': 85.64, 'heat_flow': 85},
+                {'name': 'Rajgir, Bihar', 'lat': 25.02, 'lon': 85.42, 'heat_flow': 75},
+                {'name': 'Unai, Gujarat', 'lat': 20.83, 'lon': 73.12, 'heat_flow': 70},
+                {'name': 'Vajreshwari, Maharashtra', 'lat': 19.42, 'lon': 73.08, 'heat_flow': 65},
+            ]
+            
+            # Find nearest geothermal zone
+            min_distance = float('inf')
+            heat_flow = 40  # Default background heat flow
+            nearest_zone = None
+            
+            for zone in geothermal_zones:
+                dist = self._haversine_distance(lat, lon, zone['lat'], zone['lon'])
+                if dist < min_distance:
+                    min_distance = dist
+                    result['distance_to_zone_km'] = dist
+                    
+                    # Interpolate heat flow based on distance
+                    if dist < 50:  # Within 50km
+                        heat_flow = zone['heat_flow'] * (1 - dist/100)
+                        nearest_zone = zone['name']
+                    elif dist < 100:  # Within 100km
+                        heat_flow = zone['heat_flow'] * 0.6 * (1 - dist/200)
+                        nearest_zone = zone['name']
+                    elif dist < 200:  # Within 200km
+                        heat_flow = max(40, zone['heat_flow'] * 0.3)
+                        nearest_zone = zone['name']
+            
+            result['heat_flow_mw_m2'] = round(heat_flow, 1)
+            result['nearest_zone'] = nearest_zone
+            
+            # Add conditions
+            result['conditions'].append({
+                'metric': 'Heat Flow',
+                'value': f"{heat_flow:.1f} mW/m²",
+                'status': 'good' if heat_flow > 80 else 'fair' if heat_flow > 50 else 'poor'
+            })
+            
+            if nearest_zone:
+                result['conditions'].append({
+                    'metric': 'Nearest Geothermal Zone',
+                    'value': f"{nearest_zone} ({min_distance:.0f} km)",
+                    'status': 'good' if min_distance < 50 else 'fair' if min_distance < 100 else 'poor'
+                })
+            
+            # Score calculation based on heat flow
+            if heat_flow >= 80:
+                result['score'] = 75 + (heat_flow - 80) * 0.5
+                result['rating'] = 'HIGH'
+                result['baseload_capable'] = True
+                result['grade'] = 'Excellent'
+                result['reasoning'] = f'Excellent geothermal potential with {heat_flow:.0f} mW/m² heat flow near {nearest_zone}. Ideal for 24/7 baseload electrolysis.'
+            elif heat_flow >= 50:
+                result['score'] = 35 + (heat_flow - 50) * 1.33
+                result['rating'] = 'MODERATE'
+                result['baseload_capable'] = heat_flow >= 70
+                result['grade'] = 'Good' if result['score'] >= 50 else 'Fair'
+                result['reasoning'] = f'Moderate geothermal potential at {heat_flow:.0f} mW/m². May supplement primary renewable sources.'
+            else:
+                result['score'] = heat_flow * 0.7
+                result['rating'] = 'LOW'
+                result['baseload_capable'] = False
+                result['grade'] = 'Poor'
+                result['reasoning'] = f'Limited geothermal potential ({heat_flow:.0f} mW/m²). Not recommended as primary energy source.'
+            
+            result['conditions'].append({
+                'metric': 'Baseload Capable',
+                'value': 'Yes' if result['baseload_capable'] else 'No',
+                'status': 'good' if result['baseload_capable'] else 'poor'
+            })
+            
+            result['conditions'].append({
+                'metric': 'Geothermal Rating',
+                'value': result['rating'],
+                'status': 'good' if result['rating'] == 'HIGH' else 'fair' if result['rating'] == 'MODERATE' else 'poor'
+            })
+            
+        except Exception as e:
+            print(f"[ERROR] Geothermal evaluation failed: {e}")
+            result['reasoning'] = f"Unable to evaluate geothermal potential: {str(e)}"
+        
+        return result
+    
+    # =========================================================================
+    # MAIN EVALUATION & 6-VECTOR DECISION MATRIX
     # =========================================================================
     
     def evaluate_site(self, lat: float, lon: float, name: str = None) -> Dict:
         """
-        Complete site evaluation with recommendation
+        Complete site evaluation with 6-VECTOR FEASIBILITY MATRIX
+        
+        Evaluates:
+        1. Solar (PV potential)
+        2. Wind (Hellman extrapolation)
+        3. Hydro (gravity head + water bodies)
+        4. Biomass/MSW (urban density + traffic routing)
+        5. Grid Wheeling (virtual PPA economics)
+        6. Geothermal (heat flow potential)
         
         Returns:
-            Dict with solar, wind, hydro evaluations, overall recommendation,
-            and detailed reasoning for the decision
+            Dict with 6-vector matrix, fallback logic, and recommendation
         """
-        print(f"[EVAL] Evaluating site at ({lat}, {lon})...")
+        print(f"[EVAL] 6-VECTOR Evaluation for site at ({lat}, {lon})...")
         
-        # Run all evaluations
+        # ======= PARALLEL EVALUATION OF ALL 6 SOURCES =======
         solar = self.evaluate_solar(lat, lon)
         wind = self.evaluate_wind(lat, lon)
         hydro = self.evaluate_hydro(lat, lon)
+        biomass_msw = self.evaluate_biomass_msw(lat, lon)
+        grid_wheeling = self.evaluate_grid_wheeling(lat, lon)
+        geothermal = self.evaluate_geothermal(lat, lon)
         
-        # Determine recommendation
-        scores = {
-            'solar': solar['score'],
-            'wind': wind['score'],
-            'hydro': hydro['score']
+        # ======= 6-VECTOR FEASIBILITY MATRIX =======
+        feasibility_matrix = {
+            'solar': {'score': solar['score'], 'grade': solar['grade'], 'data': solar},
+            'wind': {'score': wind['score'], 'grade': wind['grade'], 'data': wind},
+            'hydro': {'score': hydro['score'], 'grade': hydro['grade'], 'data': hydro},
+            'biomass_msw': {'score': biomass_msw['score'], 'grade': biomass_msw['grade'], 'data': biomass_msw},
+            'grid_wheeling': {'score': grid_wheeling['score'], 'grade': grid_wheeling['grade'], 'data': grid_wheeling},
+            'geothermal': {'score': geothermal['score'], 'grade': geothermal['grade'], 'data': geothermal}
         }
         
-        best_source = max(scores, key=scores.get)
-        best_score = scores[best_source]
+        # All scores dict
+        scores = {k: v['score'] for k, v in feasibility_matrix.items()}
         
-        # Check for hybrid potential
-        viable_sources = [s for s, score in scores.items() if score >= 60]
+        # Primary source scores
+        primary_scores = [solar['score'], wind['score'], hydro['score']]
         
-        # Build recommendation
-        if len(viable_sources) >= 2:
-            recommendation = 'Hybrid Plant'
-            recommendation_type = 'hybrid'
-            primary_reason = f"Multiple viable sources detected: {', '.join([s.title() for s in viable_sources])}"
+        # ======= FALLBACK LOGIC =======
+        fallback_triggered = False
+        fallback_reason = None
+        
+        # RED ZONE CHECK: All primary sources < 40%
+        if all(s < 40 for s in primary_scores):
+            fallback_triggered = True
+            fallback_reason = 'PRIMARY_SOURCES_LOW'
             
-            if solar['score'] >= 60 and wind['score'] >= 60:
-                electrolysis_type = 'Solar-Wind Hybrid with dual PEM/Alkaline'
-            elif solar['score'] >= 60 and hydro['score'] >= 60:
-                electrolysis_type = 'Solar-Hydro Hybrid with baseload PEM'
-            else:
-                electrolysis_type = 'Wind-Hydro Hybrid with Alkaline baseload'
-                
-        elif best_source == 'solar' and best_score >= 50:
-            recommendation = 'Solar-PEM Electrolysis'
-            recommendation_type = 'solar'
-            primary_reason = f"Solar is the optimal primary source with {solar['sunshine_hours_per_year']:,.0f} hrs/year sunshine"
-            electrolysis_type = 'PEM (Proton Exchange Membrane)'
+            # Recommend Biomass/MSW as fallback
+            recommendation_type = 'biomass_msw_fallback'
+            recommendation = f'{biomass_msw["source_type"]} Energy Plant'
+            electrolysis_type = 'Biogas-to-H2 with Reforming' if biomass_msw['source_type'] == 'BIOMASS' else 'MSW Gasification'
+            primary_reason = f'⚠️ RED ZONE: Solar ({solar["score"]:.0f}%), Wind ({wind["score"]:.0f}%), Hydro ({hydro["score"]:.0f}%) all below 40%. Fallback to {biomass_msw["source_type"]} recommended.'
             
-        elif best_source == 'wind' and best_score >= 50:
-            recommendation = 'Wind-Alkaline Electrolysis'
-            recommendation_type = 'wind'
-            primary_reason = f"Wind is optimal with {wind['wind_speed_80m']:.1f} m/s at turbine height"
-            electrolysis_type = 'Alkaline (best for variable wind)'
-            
-        elif best_source == 'hydro' and hydro['viable']:
-            recommendation = 'Hydro-Alkaline Electrolysis'
-            recommendation_type = 'hydro'
-            primary_reason = f"Hydro provides reliable baseload with {hydro['elevation_head_m']:.0f}m head"
-            electrolysis_type = 'Alkaline (steady operation)'
+            print(f"[WARN] RED ZONE DETECTED - Triggering Biomass/MSW fallback")
             
         else:
-            recommendation = 'Site Not Recommended'
-            recommendation_type = 'not_viable'
-            primary_reason = "No renewable source shows sufficient potential for viable hydrogen production"
-            electrolysis_type = 'N/A'
+            # Normal recommendation logic
+            best_source = max(scores, key=scores.get)
+            best_score = scores[best_source]
+            
+            # Check for viable hybrid combinations
+            viable_sources = [s for s, score in scores.items() if score >= 60]
+            primary_viable = [s for s in ['solar', 'wind', 'hydro'] if scores[s] >= 60]
+            
+            if len(primary_viable) >= 2:
+                # Hybrid Plant recommendation
+                recommendation_type = 'hybrid'
+                recommendation = 'Hybrid Multi-Source Plant'
+                
+                if 'solar' in primary_viable and 'wind' in primary_viable:
+                    electrolysis_type = 'Solar-Wind Hybrid with PEM/Alkaline'
+                elif 'solar' in primary_viable and 'hydro' in primary_viable:
+                    electrolysis_type = 'Solar-Hydro Hybrid with Baseload PEM'
+                elif 'wind' in primary_viable and 'hydro' in primary_viable:
+                    electrolysis_type = 'Wind-Hydro Hybrid with Alkaline'
+                else:
+                    electrolysis_type = 'Multi-Source Hybrid'
+                
+                primary_reason = f"Multiple viable sources detected: {', '.join([s.title() for s in primary_viable])}"
+                
+            elif best_source == 'solar' and best_score >= 50:
+                recommendation_type = 'solar'
+                recommendation = 'Solar-PEM Electrolysis Plant'
+                electrolysis_type = 'PEM (Proton Exchange Membrane)'
+                primary_reason = f"Solar is optimal with {solar['sunshine_hours_per_year']:,.0f} hrs/year sunshine"
+                
+            elif best_source == 'wind' and best_score >= 50:
+                recommendation_type = 'wind'
+                recommendation = 'Wind-Alkaline Electrolysis Plant'
+                electrolysis_type = 'Alkaline (best for variable wind)'
+                primary_reason = f"Wind is optimal with {wind['wind_speed_80m']:.1f} m/s at hub height"
+                
+            elif best_source == 'hydro' and hydro.get('viable', False):
+                recommendation_type = 'hydro'
+                recommendation = 'Hydro-Alkaline Electrolysis Plant'
+                electrolysis_type = 'Alkaline (steady operation)'
+                primary_reason = f"Hydro provides baseload with {hydro['elevation_head_m']:.0f}m head"
+                
+            elif best_source == 'geothermal' and geothermal.get('baseload_capable', False):
+                recommendation_type = 'geothermal'
+                recommendation = 'Geothermal Baseload Plant'
+                electrolysis_type = 'PEM (24/7 baseload operation)'
+                primary_reason = f"Geothermal offers 24/7 baseload at {geothermal['heat_flow_mw_m2']} mW/m²"
+                
+            elif best_source == 'grid_wheeling' and best_score >= 50:
+                recommendation_type = 'grid_wheeling'
+                recommendation = 'Virtual PPA / Grid Wheeling'
+                electrolysis_type = 'Remote renewable + Grid transmission'
+                primary_reason = f"Grid wheeling viable in {grid_wheeling['state']} with {grid_wheeling['wheeling_charge_per_kwh']:.2f}₹/kWh"
+                
+            elif biomass_msw['score'] >= 50:
+                recommendation_type = 'biomass_msw'
+                recommendation = f'{biomass_msw["source_type"]} Energy Plant'
+                electrolysis_type = 'Biogas Reforming' if biomass_msw['source_type'] == 'BIOMASS' else 'MSW Gasification'
+                primary_reason = f"{biomass_msw['source_type']} viable with {biomass_msw['score']:.0f}% score"
+                
+            else:
+                recommendation_type = 'not_viable'
+                recommendation = 'Site Not Recommended'
+                electrolysis_type = 'N/A'
+                primary_reason = "No energy source achieves viable threshold"
         
-        # Calculate overall viability score (weighted average)
-        overall_score = (solar['score'] * 0.4 + wind['score'] * 0.35 + hydro['score'] * 0.25)
+        # ======= BUILD DETAILED REASONS FOR ALL 6 SOURCES =======
+        detailed_reasons = [
+            {
+                'source': 'Solar',
+                'score': solar['score'],
+                'grade': solar['grade'],
+                'summary': solar['reasoning'],
+                'icon': '☀️',
+                'color': 'yellow'
+            },
+            {
+                'source': 'Wind',
+                'score': wind['score'],
+                'grade': wind['grade'],
+                'summary': wind['reasoning'],
+                'icon': '💨',
+                'color': 'blue',
+                'physics': wind.get('hellman_calculation', {})
+            },
+            {
+                'source': 'Hydro',
+                'score': hydro['score'],
+                'grade': hydro['grade'],
+                'summary': hydro['reasoning'],
+                'icon': '💧',
+                'color': 'cyan'
+            },
+            {
+                'source': f'Biomass/{biomass_msw["source_type"]}',
+                'score': biomass_msw['score'],
+                'grade': biomass_msw['grade'],
+                'summary': biomass_msw['reasoning'],
+                'icon': '🌿',
+                'color': 'green',
+                'is_fallback': fallback_triggered and recommendation_type == 'biomass_msw_fallback'
+            },
+            {
+                'source': 'Grid Wheeling',
+                'score': grid_wheeling['score'],
+                'grade': grid_wheeling['grade'],
+                'summary': grid_wheeling['reasoning'],
+                'icon': '⚡',
+                'color': 'purple'
+            },
+            {
+                'source': 'Geothermal',
+                'score': geothermal['score'],
+                'grade': geothermal['grade'],
+                'summary': geothermal['reasoning'],
+                'icon': '🌋',
+                'color': 'orange',
+                'baseload_capable': geothermal.get('baseload_capable', False)
+            }
+        ]
         
-        # Build detailed reasoning
-        detailed_reasons = []
+        # Calculate overall viability score (weighted average across all 6)
+        weights = {
+            'solar': 0.25,
+            'wind': 0.20,
+            'hydro': 0.15,
+            'biomass_msw': 0.15,
+            'grid_wheeling': 0.10,
+            'geothermal': 0.15
+        }
+        overall_score = sum(scores[k] * v for k, v in weights.items())
         
-        # Solar reasoning
-        detailed_reasons.append({
-            'source': 'Solar',
-            'score': solar['score'],
-            'grade': solar['grade'],
-            'summary': solar['reasoning'],
-            'icon': '☀️',
-            'color': 'yellow'
-        })
+        # Zone classification
+        if overall_score >= 70:
+            zone = 'GREEN'
+            zone_message = 'Excellent site viability'
+        elif overall_score >= 50:
+            zone = 'YELLOW'
+            zone_message = 'Moderate site viability - consider optimization'
+        elif overall_score >= 30:
+            zone = 'ORANGE'
+            zone_message = 'Limited viability - fallback sources recommended'
+        else:
+            zone = 'RED'
+            zone_message = 'Poor viability - site not recommended'
         
-        # Wind reasoning
-        detailed_reasons.append({
-            'source': 'Wind',
-            'score': wind['score'],
-            'grade': wind['grade'],
-            'summary': wind['reasoning'],
-            'icon': '💨',
-            'color': 'blue',
-            'physics': wind.get('hellman_calculation', {})
-        })
-        
-        # Hydro reasoning
-        detailed_reasons.append({
-            'source': 'Hydro',
-            'score': hydro['score'],
-            'grade': hydro['grade'],
-            'summary': hydro['reasoning'],
-            'icon': '💧',
-            'color': 'cyan'
-        })
-        
+        # ======= BUILD RESULT =======
         result = {
             'success': True,
             'location': {
@@ -741,25 +1344,41 @@ class SiteEvaluator:
                 'longitude': lon,
                 'name': name
             },
+            # Full evaluations
             'evaluations': {
                 'solar': solar,
                 'wind': wind,
-                'hydro': hydro
+                'hydro': hydro,
+                'biomass_msw': biomass_msw,
+                'grid_wheeling': grid_wheeling,
+                'geothermal': geothermal
             },
+            # 6-Vector Matrix
+            'feasibility_matrix': feasibility_matrix,
             'scores': scores,
             'overall_score': round(overall_score, 1),
+            # Zone classification
+            'zone': {
+                'level': zone,
+                'message': zone_message,
+                'primary_scores_below_40': all(s < 40 for s in primary_scores)
+            },
+            # Recommendation
             'recommendation': {
                 'type': recommendation_type,
                 'title': recommendation,
                 'electrolysis': electrolysis_type,
                 'primary_reason': primary_reason,
                 'detailed_reasons': detailed_reasons,
-                'viable_sources': viable_sources
+                'viable_sources': [s for s, score in scores.items() if score >= 50],
+                # Fallback info
+                'fallback_triggered': fallback_triggered,
+                'fallback_reason': fallback_reason
             },
             'timestamp': datetime.now().isoformat()
         }
         
-        print(f"[EVAL] Complete. Recommendation: {recommendation} (Score: {overall_score:.1f})")
+        print(f"[EVAL] Complete. Zone: {zone} | Recommendation: {recommendation} (Score: {overall_score:.1f})")
         return result
     
     def add_plant_to_database(self, evaluation: Dict, plant_name: str, capacity_kw: float) -> Dict:

@@ -42,8 +42,8 @@ interface ActiveDelivery {
     total_price?: number;
 }
 
-// INR to USD conversion
-const INR_TO_USD = 0.012;
+// Display all currency in INR (₹)
+// Data is already in INR from the database
 
 // ============ MAIN COMPONENT ============
 const Transport = () => {
@@ -409,7 +409,7 @@ const Transport = () => {
                                             <span className="text-xs text-gray-500">Transport Cost</span>
                                         </div>
                                         <p className="text-2xl font-bold text-green-400">
-                                            ${selectedOrder.transport_cost_inr ? (selectedOrder.transport_cost_inr * INR_TO_USD).toFixed(0) : 'N/A'}
+                                            ₹{selectedOrder.transport_cost_inr ? selectedOrder.transport_cost_inr.toLocaleString('en-IN') : 'N/A'}
                                         </p>
                                     </div>
 
@@ -444,7 +444,7 @@ const Transport = () => {
                                     {selectedOrder.total_price && (
                                         <div className="text-right">
                                             <p className="text-gray-500 text-xs">Order Value</p>
-                                            <p className="text-xl font-bold text-white">${(selectedOrder.total_price).toFixed(2)}</p>
+                                            <p className="text-xl font-bold text-white">₹{(selectedOrder.total_price * 89.9).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
                                         </div>
                                     )}
                                 </div>

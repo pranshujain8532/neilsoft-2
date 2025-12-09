@@ -14,6 +14,13 @@ import {
 } from 'recharts';
 import PlantDetailModal from '../../components/PlantDetailModal';
 
+// Currency: All values in INR (₹)
+// LCOH values are stored in USD but displayed in INR
+// Conversion rate: 1 USD = 89.9 INR
+const USD_TO_INR = 89.9;
+const formatINR = (value: number) => `₹${value.toLocaleString('en-IN')}`;
+const convertToINR = (usdValue: number) => Math.round(usdValue * USD_TO_INR);
+
 interface PlantData {
     plant_id: string;
     plant_name: string;
@@ -315,12 +322,12 @@ const Dashboard = () => {
                                 <span className="text-xs text-blue-400/80 uppercase tracking-wider font-medium">Avg LCOH</span>
                             </div>
                             <div className="text-3xl font-bold text-white mb-1">
-                                $<AnimatedCounter value={totalStats.avgLcoh} decimals={2} />
+                                ₹<AnimatedCounter value={convertToINR(totalStats.avgLcoh)} />
                                 <span className="text-lg text-gray-400">/kg</span>
                             </div>
                             <div className="flex items-center gap-1 text-xs text-emerald-400">
                                 <CheckCircle2 className="w-3 h-3" />
-                                <span>Below $2 target</span>
+                                <span>Below ₹180/kg target</span>
                             </div>
                         </div>
                     </div>
@@ -334,7 +341,7 @@ const Dashboard = () => {
                                 <span className="text-xs text-purple-400/80 uppercase tracking-wider font-medium">Daily Profit</span>
                             </div>
                             <div className="text-3xl font-bold text-white mb-1">
-                                $<AnimatedCounter value={totalStats.totalProfit} />
+                                ₹<AnimatedCounter value={convertToINR(totalStats.totalProfit)} />
                             </div>
                             <div className="flex items-center gap-1 text-xs text-emerald-400">
                                 <TrendingUp className="w-3 h-3" />
@@ -410,7 +417,7 @@ const Dashboard = () => {
                                 </div>
                                 <div className="flex items-center gap-4 text-sm">
                                     <span className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-emerald-400"></div> Production (kg)</span>
-                                    <span className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-purple-400"></div> Profit ($)</span>
+                                    <span className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-purple-400"></div> Profit (₹)</span>
                                 </div>
                             </div>
                             <div className="h-[280px]">
@@ -433,7 +440,7 @@ const Dashboard = () => {
                                             labelStyle={{ color: '#94a3b8' }}
                                         />
                                         <Area type="monotone" dataKey="production" stroke="#10b981" fill="url(#productionGrad)" strokeWidth={2} name="Production (kg)" />
-                                        <Area type="monotone" dataKey="profit" stroke="#a855f7" fill="url(#profitGrad)" strokeWidth={2} name="Profit ($)" />
+                                        <Area type="monotone" dataKey="profit" stroke="#a855f7" fill="url(#profitGrad)" strokeWidth={2} name="Profit (₹)" />
                                     </AreaChart>
                                 </ResponsiveContainer>
                             </div>
@@ -599,7 +606,7 @@ const Dashboard = () => {
                                             </div>
                                         </div>
                                         <span className={`text-sm font-bold ${slot.peak ? 'text-emerald-400' : 'text-white'}`}>
-                                            ${slot.profit.toLocaleString()}
+                                            ₹{(slot.profit * 89.9).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                                         </span>
                                         {slot.peak && <TrendingUp className="w-3 h-3 text-emerald-400" />}
                                     </motion.div>
@@ -616,7 +623,7 @@ const Dashboard = () => {
                                     </div>
                                 </div>
                                 <div className="text-3xl font-bold text-white">
-                                    $<AnimatedCounter value={Math.round(totalStats.totalProfit * 1.085)} />
+                                    ₹<AnimatedCounter value={convertToINR(Math.round(totalStats.totalProfit * 1.085))} />
                                 </div>
                                 <div className="flex items-center gap-4 mt-3 text-xs">
                                     <div className="flex items-center gap-1">
@@ -668,9 +675,9 @@ const Dashboard = () => {
                                         </div>
                                         <div className="text-right">
                                             <div className="text-emerald-400 font-bold">
-                                                ${(plant.profit_prediction?.daily_profit || 0).toLocaleString()}
+                                                ₹{convertToINR(plant.profit_prediction?.daily_profit || 0).toLocaleString('en-IN')}
                                             </div>
-                                            <div className="text-xs text-gray-500">LCOH: ${plant.lcoh?.toFixed(2)}</div>
+                                            <div className="text-xs text-gray-500">LCOH: ₹{convertToINR(plant.lcoh || 0)?.toLocaleString('en-IN')}</div>
                                         </div>
                                     </motion.div>
                                 ))}

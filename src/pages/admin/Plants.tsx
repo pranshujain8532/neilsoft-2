@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     Activity, Wrench, XCircle, MapPin, TrendingUp, Zap, Sun, Wind, Droplets,
     ThermometerSun, Cloud, X, History, DollarSign, Leaf, Clock, ChevronRight,
-    RefreshCw, Gauge, Plus, Loader2, CheckCircle, AlertTriangle, Info, Sparkles
+    RefreshCw, Gauge, Plus, Loader2, CheckCircle, AlertTriangle, Info, Sparkles,
+    Fuel, Power, Flame, Check, Square, CheckSquare
 } from 'lucide-react';
 import { plantAPI, productionHistoryAPI, mlApi } from '@/utils/api';
 import {
@@ -18,9 +19,25 @@ interface SiteEvaluation {
         solar: EnergyEvaluation;
         wind: WindEvaluation;
         hydro: EnergyEvaluation;
+        biomass_msw?: EnergyEvaluation;
+        grid_wheeling?: EnergyEvaluation;
+        geothermal?: EnergyEvaluation;
     };
-    scores: { solar: number; wind: number; hydro: number };
+    scores: {
+        solar: number;
+        wind: number;
+        hydro: number;
+        biomass_msw?: number;
+        grid_wheeling?: number;
+        geothermal?: number;
+    };
     overall_score: number;
+    zone?: {
+        level: string;
+        message: string;
+        primary_scores_below_40: boolean;
+    };
+    feasibility_matrix?: Record<string, { score: number; grade: string; data: any }>;
     recommendation: {
         type: string;
         title: string;
@@ -28,6 +45,8 @@ interface SiteEvaluation {
         primary_reason: string;
         detailed_reasons: DetailedReason[];
         viable_sources: string[];
+        fallback_triggered?: boolean;
+        fallback_reason?: string;
     };
 }
 
@@ -125,6 +144,22 @@ const Plants = () => {
     const [evaluating, setEvaluating] = useState(false);
     const [siteEvaluation, setSiteEvaluation] = useState<SiteEvaluation | null>(null);
     const [addingPlant, setAddingPlant] = useState(false);
+
+    // 6-Vector Energy Mix Selection State
+    const [selectedEnergySources, setSelectedEnergySources] = useState<Set<string>>(new Set());
+
+    // Toggle energy source selection
+    const toggleEnergySource = (source: string) => {
+        setSelectedEnergySources(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(source)) {
+                newSet.delete(source);
+            } else {
+                newSet.add(source);
+            }
+            return newSet;
+        });
+    };
 
     useEffect(() => {
         fetchPlants();
@@ -416,7 +451,7 @@ const Plants = () => {
                                             <DollarSign className="w-3.5 h-3.5" />
                                             LCOH
                                         </div>
-                                        <p className="text-lg font-bold text-amber-400">${plant.lcoh || 2.0}/kg</p>
+                                        <p className="text-lg font-bold text-amber-400">₹{Math.round((plant.lcoh || 2.0) * 89.9)}/kg</p>
                                     </div>
                                     <div>
                                         <div className="flex items-center gap-2 text-gray-500 text-xs mb-1">
@@ -494,7 +529,7 @@ const Plants = () => {
                                         {[
                                             { label: 'Capacity', value: `${selectedPlant.capacity_mw || selectedPlant.capacity} MW`, icon: Zap, color: 'from-hydrogen-500 to-hydrogen-600' },
                                             { label: 'Efficiency', value: `${selectedPlant.efficiency || selectedPlant.efficiency_percent}%`, icon: TrendingUp, color: 'from-emerald-500 to-emerald-600' },
-                                            { label: 'LCOH', value: `$${selectedPlant.lcoh || 2.0}/kg`, icon: DollarSign, color: 'from-amber-500 to-amber-600' },
+                                            { label: 'LCOH', value: `₹${Math.round((selectedPlant.lcoh || 2.0) * 89.9)}/kg`, icon: DollarSign, color: 'from-amber-500 to-amber-600' },
                                             { label: 'Renewable', value: `${selectedPlant.renewable_percentage || 0}%`, icon: Leaf, color: 'from-green-500 to-green-600' },
                                         ].map((metric) => (
                                             <div key={metric.label} className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
@@ -647,7 +682,7 @@ const Plants = () => {
                                                             <div className="text-right">
                                                                 <p className="text-lg font-bold text-hydrogen-400">{record.production_kg} kg</p>
                                                                 <p className="text-gray-500 text-xs">
-                                                                    {record.efficiency_percent?.toFixed(1) || '-'}% | ${record.lcoh?.toFixed(2) || '-'}/kg
+                                                                    {record.efficiency_percent?.toFixed(1) || '-'}% | ₹{Math.round((record.lcoh || 0) * 89.9)}/kg
                                                                 </p>
                                                             </div>
                                                         </div>
@@ -865,28 +900,82 @@ const Plants = () => {
                                                 <p className="text-hydrogen-400 text-sm mt-1">{siteEvaluation.recommendation.electrolysis}</p>
                                             </div>
 
-                                            {/* Source Scores */}
-                                            <div className="grid grid-cols-3 gap-4">
-                                                {[
-                                                    { key: 'solar', icon: Sun, color: 'yellow', label: 'Solar' },
-                                                    { key: 'wind', icon: Wind, color: 'blue', label: 'Wind' },
-                                                    { key: 'hydro', icon: Droplets, color: 'cyan', label: 'Hydro' }
-                                                ].map((source) => {
-                                                    const score = siteEvaluation.scores[source.key as keyof typeof siteEvaluation.scores];
-                                                    const evalu = siteEvaluation.evaluations[source.key as keyof typeof siteEvaluation.evaluations];
-                                                    return (
-                                                        <div key={source.key} className={`p-4 rounded-xl bg-${source.color}-500/10 border border-${source.color}-500/30`}>
-                                                            <source.icon className={`w-8 h-8 text-${source.color}-400 mb-2`} />
-                                                            <p className="text-2xl font-bold text-white">{score.toFixed(0)}</p>
-                                                            <p className="text-gray-400 text-sm">{source.label}</p>
-                                                            <span className={`text-xs px-2 py-0.5 rounded-full ${evalu.grade === 'Excellent' ? 'bg-green-500/20 text-green-400' :
-                                                                    evalu.grade === 'Good' ? 'bg-blue-500/20 text-blue-400' :
-                                                                        evalu.grade === 'Fair' ? 'bg-yellow-500/20 text-yellow-400' :
-                                                                            'bg-red-500/20 text-red-400'
-                                                                }`}>{evalu.grade}</span>
-                                                        </div>
-                                                    );
-                                                })}
+                                            {/* 6-VECTOR ENERGY MIX SELECTOR */}
+                                            <div className="space-y-4">
+                                                <div className="flex items-center justify-between">
+                                                    <h4 className="text-white font-semibold">Select Your Energy Mix:</h4>
+                                                    <span className="text-xs text-gray-400">
+                                                        {selectedEnergySources.size > 0 ? `${selectedEnergySources.size} source${selectedEnergySources.size > 1 ? 's' : ''} selected` : 'Click to select sources'}
+                                                    </span>
+                                                </div>
+
+                                                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                                    {[
+                                                        { key: 'solar', icon: Sun, color: 'yellow', label: 'Solar PV', bgClass: 'bg-yellow-500/10 border-yellow-500/30 hover:border-yellow-500', activeClass: 'bg-yellow-500/30 border-yellow-500' },
+                                                        { key: 'wind', icon: Wind, color: 'blue', label: 'Wind Power', bgClass: 'bg-blue-500/10 border-blue-500/30 hover:border-blue-500', activeClass: 'bg-blue-500/30 border-blue-500' },
+                                                        { key: 'hydro', icon: Droplets, color: 'cyan', label: 'Hydro Power', bgClass: 'bg-cyan-500/10 border-cyan-500/30 hover:border-cyan-500', activeClass: 'bg-cyan-500/30 border-cyan-500' },
+                                                        { key: 'biomass_msw', icon: Fuel, color: 'green', label: 'Biomass/MSW', bgClass: 'bg-green-500/10 border-green-500/30 hover:border-green-500', activeClass: 'bg-green-500/30 border-green-500' },
+                                                        { key: 'grid_wheeling', icon: Power, color: 'purple', label: 'Grid Wheeling', bgClass: 'bg-purple-500/10 border-purple-500/30 hover:border-purple-500', activeClass: 'bg-purple-500/30 border-purple-500' },
+                                                        { key: 'geothermal', icon: Flame, color: 'orange', label: 'Geothermal', bgClass: 'bg-orange-500/10 border-orange-500/30 hover:border-orange-500', activeClass: 'bg-orange-500/30 border-orange-500' }
+                                                    ].map((source) => {
+                                                        const score = siteEvaluation.scores?.[source.key as keyof typeof siteEvaluation.scores] ?? 0;
+                                                        const evalu = siteEvaluation.evaluations?.[source.key as keyof typeof siteEvaluation.evaluations];
+                                                        const isSelected = selectedEnergySources.has(source.key);
+                                                        const isRecommended = siteEvaluation.recommendation.type === source.key ||
+                                                            (siteEvaluation.recommendation.type === 'hybrid' && score >= 60);
+
+                                                        return (
+                                                            <button
+                                                                key={source.key}
+                                                                onClick={() => toggleEnergySource(source.key)}
+                                                                className={`
+                                                                    relative p-4 rounded-xl border-2 transition-all cursor-pointer text-left
+                                                                    ${isSelected ? source.activeClass : source.bgClass}
+                                                                `}
+                                                            >
+                                                                {/* Selection Checkbox */}
+                                                                <div className="absolute top-2 right-2">
+                                                                    {isSelected ? (
+                                                                        <CheckSquare className={`w-5 h-5 text-${source.color}-400`} />
+                                                                    ) : (
+                                                                        <Square className="w-5 h-5 text-gray-500" />
+                                                                    )}
+                                                                </div>
+
+                                                                {/* Recommended Badge */}
+                                                                {isRecommended && (
+                                                                    <span className="absolute -top-2 left-2 text-xs px-2 py-0.5 bg-hydrogen-500 text-white rounded-full">
+                                                                        ★ AI Pick
+                                                                    </span>
+                                                                )}
+
+                                                                <source.icon className={`w-7 h-7 text-${source.color}-400 mb-2`} />
+                                                                <p className="text-2xl font-bold text-white">{typeof score === 'number' ? score.toFixed(0) : '0'}</p>
+                                                                <p className="text-gray-400 text-sm">{source.label}</p>
+
+                                                                {evalu && (
+                                                                    <span className={`text-xs px-2 py-0.5 rounded-full mt-2 inline-block ${evalu.grade === 'Excellent' ? 'bg-green-500/20 text-green-400' :
+                                                                        evalu.grade === 'Good' ? 'bg-blue-500/20 text-blue-400' :
+                                                                            evalu.grade === 'Fair' ? 'bg-yellow-500/20 text-yellow-400' :
+                                                                                'bg-red-500/20 text-red-400'
+                                                                        }`}>{evalu.grade}</span>
+                                                                )}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+
+                                                {/* Selected Mix Summary */}
+                                                {selectedEnergySources.size > 0 && (
+                                                    <div className="p-3 bg-gradient-to-r from-hydrogen-500/10 to-purple-500/10 rounded-xl border border-hydrogen-500/30">
+                                                        <p className="text-sm text-gray-300">
+                                                            <span className="text-hydrogen-400 font-medium">Selected Mix: </span>
+                                                            {Array.from(selectedEnergySources).map(s =>
+                                                                s.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())
+                                                            ).join(' + ')}
+                                                        </p>
+                                                    </div>
+                                                )}
                                             </div>
 
                                             {/* Primary Reason */}
@@ -909,9 +998,9 @@ const Plants = () => {
                                                             <span className="text-xl">{reason.icon}</span>
                                                             <span className="font-medium text-white">{reason.source}</span>
                                                             <span className={`ml-auto text-sm ${reason.grade === 'Excellent' ? 'text-green-400' :
-                                                                    reason.grade === 'Good' ? 'text-blue-400' :
-                                                                        reason.grade === 'Fair' ? 'text-yellow-400' :
-                                                                            'text-red-400'
+                                                                reason.grade === 'Good' ? 'text-blue-400' :
+                                                                    reason.grade === 'Fair' ? 'text-yellow-400' :
+                                                                        'text-red-400'
                                                                 }`}>{reason.score.toFixed(0)}/100</span>
                                                         </div>
                                                         <p className="text-gray-400 text-sm">{reason.summary}</p>
@@ -997,11 +1086,53 @@ const Plants = () => {
                                                 <h4 className="text-white font-medium mb-3">Plant Summary:</h4>
                                                 <div className="grid grid-cols-2 gap-3 text-sm">
                                                     <div><span className="text-gray-400">Location:</span> <span className="text-white">{newPlantCoords.lat}°N, {newPlantCoords.lon}°E</span></div>
-                                                    <div><span className="text-gray-400">Type:</span> <span className="text-hydrogen-400">{siteEvaluation.recommendation.type}</span></div>
-                                                    <div><span className="text-gray-400">Solar Score:</span> <span className="text-yellow-400">{siteEvaluation.scores.solar.toFixed(0)}</span></div>
-                                                    <div><span className="text-gray-400">Wind Score:</span> <span className="text-blue-400">{siteEvaluation.scores.wind.toFixed(0)}</span></div>
-                                                    <div><span className="text-gray-400">Hydro Score:</span> <span className="text-cyan-400">{siteEvaluation.scores.hydro.toFixed(0)}</span></div>
-                                                    <div><span className="text-gray-400">Overall:</span> <span className="text-green-400">{siteEvaluation.overall_score.toFixed(0)}/100</span></div>
+                                                    <div><span className="text-gray-400">AI Recommendation:</span> <span className="text-hydrogen-400">{siteEvaluation.recommendation.type}</span></div>
+
+                                                    {/* Selected Energy Mix */}
+                                                    <div className="col-span-2 mt-2 p-2 bg-gray-800/50 rounded-lg">
+                                                        <span className="text-gray-400">Your Selected Mix: </span>
+                                                        {selectedEnergySources.size > 0 ? (
+                                                            <span className="text-hydrogen-400 font-medium">
+                                                                {Array.from(selectedEnergySources).map(s =>
+                                                                    s === 'biomass_msw' ? 'Biomass/MSW' :
+                                                                        s === 'grid_wheeling' ? 'Grid Wheeling' :
+                                                                            s.charAt(0).toUpperCase() + s.slice(1)
+                                                                ).join(' + ')}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-yellow-400">(Using AI recommendation)</span>
+                                                        )}
+                                                    </div>
+
+                                                    {/* 6-Vector Scores */}
+                                                    <div className="col-span-2 mt-2 grid grid-cols-3 gap-2">
+                                                        <div className={`p-2 rounded ${selectedEnergySources.has('solar') ? 'bg-yellow-500/20 border border-yellow-500/50' : 'bg-gray-800/50'}`}>
+                                                            <span className="text-gray-400 text-xs">Solar</span>
+                                                            <p className="text-yellow-400 font-bold">{siteEvaluation.scores?.solar?.toFixed(0) ?? 0}</p>
+                                                        </div>
+                                                        <div className={`p-2 rounded ${selectedEnergySources.has('wind') ? 'bg-blue-500/20 border border-blue-500/50' : 'bg-gray-800/50'}`}>
+                                                            <span className="text-gray-400 text-xs">Wind</span>
+                                                            <p className="text-blue-400 font-bold">{siteEvaluation.scores?.wind?.toFixed(0) ?? 0}</p>
+                                                        </div>
+                                                        <div className={`p-2 rounded ${selectedEnergySources.has('hydro') ? 'bg-cyan-500/20 border border-cyan-500/50' : 'bg-gray-800/50'}`}>
+                                                            <span className="text-gray-400 text-xs">Hydro</span>
+                                                            <p className="text-cyan-400 font-bold">{siteEvaluation.scores?.hydro?.toFixed(0) ?? 0}</p>
+                                                        </div>
+                                                        <div className={`p-2 rounded ${selectedEnergySources.has('biomass_msw') ? 'bg-green-500/20 border border-green-500/50' : 'bg-gray-800/50'}`}>
+                                                            <span className="text-gray-400 text-xs">Biomass</span>
+                                                            <p className="text-green-400 font-bold">{siteEvaluation.scores?.biomass_msw?.toFixed(0) ?? '-'}</p>
+                                                        </div>
+                                                        <div className={`p-2 rounded ${selectedEnergySources.has('grid_wheeling') ? 'bg-purple-500/20 border border-purple-500/50' : 'bg-gray-800/50'}`}>
+                                                            <span className="text-gray-400 text-xs">Grid</span>
+                                                            <p className="text-purple-400 font-bold">{siteEvaluation.scores?.grid_wheeling?.toFixed(0) ?? '-'}</p>
+                                                        </div>
+                                                        <div className={`p-2 rounded ${selectedEnergySources.has('geothermal') ? 'bg-orange-500/20 border border-orange-500/50' : 'bg-gray-800/50'}`}>
+                                                            <span className="text-gray-400 text-xs">Geothermal</span>
+                                                            <p className="text-orange-400 font-bold">{siteEvaluation.scores?.geothermal?.toFixed(0) ?? '-'}</p>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="col-span-2"><span className="text-gray-400">Overall Score:</span> <span className="text-green-400 font-bold">{siteEvaluation.overall_score.toFixed(0)}/100</span></div>
                                                 </div>
                                             </div>
 

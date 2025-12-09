@@ -14,6 +14,12 @@ interface PlantData {
     status: 'operational' | 'maintenance';
 }
 
+// Currency: All values in INR (₹)
+// Conversion rate: 1 USD = 89.9 INR
+const USD_TO_INR = 89.9;
+const toINR = (usd: number) => Math.round(usd * USD_TO_INR);
+const formatINR = (value: number) => `₹${value.toLocaleString('en-IN')}`;
+
 const PlantProfitability = () => {
     const [plants, setPlants] = useState<PlantData[]>([]);
     const [loading, setLoading] = useState(true);
@@ -111,11 +117,11 @@ const PlantProfitability = () => {
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <p className="text-sm text-gray-500">Daily Profit</p>
-                            <p className="text-2xl font-bold text-green-500">${bestPlant?.dailyProfit.toLocaleString()}</p>
+                            <p className="text-2xl font-bold text-green-500">{formatINR(toINR(bestPlant?.dailyProfit || 0))}</p>
                         </div>
                         <div>
                             <p className="text-sm text-gray-500">LCOH</p>
-                            <p className="text-2xl font-bold">${bestPlant?.lcoh.toFixed(2)}/kg</p>
+                            <p className="text-2xl font-bold">₹{Math.round((bestPlant?.lcoh || 0) * 89.9)}/kg</p>
                         </div>
                     </div>
                 </div>
@@ -158,15 +164,15 @@ const PlantProfitability = () => {
                                     </td>
                                     <td className="py-3 px-4 text-right">
                                         <span className="font-bold text-green-500">
-                                            ${plant.dailyProfit.toLocaleString()}
+                                            {formatINR(toINR(plant.dailyProfit))}
                                         </span>
                                     </td>
                                     <td className="py-3 px-4 text-right text-gray-600 dark:text-gray-400">
-                                        ${plant.monthlyProfit.toLocaleString()}
+                                        {formatINR(toINR(plant.monthlyProfit))}
                                     </td>
                                     <td className="py-3 px-4 text-right">
                                         <span className={plant.lcoh < 2 ? 'text-green-500 font-medium' : ''}>
-                                            ${plant.lcoh.toFixed(2)}
+                                            ₹{Math.round(plant.lcoh * 89.9)}
                                         </span>
                                     </td>
                                     <td className="py-3 px-4 text-right">
@@ -177,8 +183,8 @@ const PlantProfitability = () => {
                                     </td>
                                     <td className="py-3 px-4 text-center">
                                         <span className={`px-2 py-1 rounded-full text-xs ${plant.status === 'operational'
-                                                ? 'bg-green-500/20 text-green-500'
-                                                : 'bg-yellow-500/20 text-yellow-500'
+                                            ? 'bg-green-500/20 text-green-500'
+                                            : 'bg-yellow-500/20 text-yellow-500'
                                             }`}>
                                             {plant.status}
                                         </span>
@@ -198,7 +204,7 @@ const PlantProfitability = () => {
                         <h4 className="font-bold">Total Daily Profit</h4>
                     </div>
                     <p className="text-2xl font-bold gradient-text">
-                        ${plants.reduce((sum, p) => sum + p.dailyProfit, 0).toLocaleString()}
+                        {formatINR(toINR(plants.reduce((sum, p) => sum + p.dailyProfit, 0)))}
                     </p>
                 </div>
                 <div className="card-glass p-4">

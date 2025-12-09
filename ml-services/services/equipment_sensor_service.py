@@ -230,10 +230,46 @@ class EquipmentSensorService:
             }
             
             self.supabase.table('equipment_maintenance_predictions').insert(data).execute()
+            
+            # Send alert if failure probability is high
+            failure_prob = prediction.get('failure_probability', 0)
+            if failure_prob >= 70:
+                self._send_failure_predicted_alert(prediction)
+            
             return {'success': True}
         except Exception as e:
             print(f"[ERROR] Failed to save prediction: {e}")
             return {'success': False, 'error': str(e)}
+    
+    def _send_failure_predicted_alert(self, prediction: Dict):
+        """Send alert for high failure probability"""
+        try:
+            from services.alert_service import alert_service
+            
+            # Get equipment and plant info
+            equipment_id = prediction.get('equipment_id')
+            equipment_name = prediction.get('equipment_name', 'Unknown Equipment')
+            plant_id = prediction.get('plant_id')
+            plant_name = prediction.get('plant_name', 'Unknown Plant')
+            
+            # Try to get details from DB
+            if self.supabase and equipment_id:
+                eq = self.supabase.table('plant_equipment').select('name, plant_id').eq('id', equipment_id).single().execute()
+                if eq.data:
+                    equipment_name = eq.data.get('name', equipment_name)
+                    plant_id = eq.data.get('plant_id', plant_id)
+                    
+                    # Get plant name
+                    if plant_id:
+                        plant = self.supabase.table('plants').select('name').eq('id', plant_id).single().execute()
+                        if plant.data:
+                            plant_name = plant.data.get('name', plant_name)
+            
+            alert_service.alert_failure_predicted(
+                plant_id, plant_name, equipment_name, prediction.get('failure_probability', 0)
+            )
+        except Exception as e:
+            print(f"[WARN] Failed to send failure prediction alert: {e}")
     
     def save_prevention_recommendations(self, plant_id: str, recommendations: List[Dict]) -> Dict:
         """Save prevention recommendations to shutdown_prevention_recommendations table"""

@@ -116,8 +116,8 @@ const scorePlant = (plant: Plant, orderQty: number, distance: number): { score: 
     };
 };
 
-// INR to USD conversion rate (approximate)
-const INR_TO_USD = 0.012;
+// Display all currency in INR (₹)
+// Data is already in INR from the database
 
 export const SmartDispatchModal = ({ isOpen, onClose, order, onDispatchConfirm }: SmartDispatchModalProps) => {
     const [loading, setLoading] = useState(false);
@@ -256,10 +256,9 @@ export const SmartDispatchModal = ({ isOpen, onClose, order, onDispatchConfirm }
         return String(location);
     };
 
-    // Convert INR to USD
-    const formatCostUSD = (costINR: number): string => {
-        const usd = costINR * INR_TO_USD;
-        return `$${usd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    // Format cost in INR
+    const formatCostINR = (costINR: number): string => {
+        return `₹${costINR.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
     };
 
     const getOptionStyle = (recommendation: string) => {
@@ -379,7 +378,7 @@ export const SmartDispatchModal = ({ isOpen, onClose, order, onDispatchConfirm }
                                                     <div className="grid grid-cols-2 gap-3">
                                                         <div className="bg-[#1a1f2e] rounded-lg p-3">
                                                             <p className="text-gray-500 text-xs mb-1">Cost</p>
-                                                            <p className="text-green-400 font-bold text-lg">{formatCostUSD(option.total_cost_inr)}</p>
+                                                            <p className="text-green-400 font-bold text-lg">{formatCostINR(option.total_cost_inr)}</p>
                                                         </div>
                                                         <div className="bg-[#1a1f2e] rounded-lg p-3">
                                                             <p className="text-gray-500 text-xs mb-1">ETA</p>

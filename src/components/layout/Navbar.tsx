@@ -33,7 +33,7 @@ const Navbar = () => {
                         </Link>
 
                         {/* Desktop Navigation */}
-                        <div className="hidden md:flex ml-10 space-x-8">
+                        <div className="hidden lg:flex ml-8 space-x-5">
                             <Link to="/" className="navbar-link flex items-center space-x-1">
                                 <Home size={18} />
                                 <span>Home</span>
@@ -109,7 +109,7 @@ const Navbar = () => {
 
                         {/* User Menu */}
                         {user.email ? (
-                            <div className="hidden md:flex items-center space-x-4">
+                            <div className="hidden lg:flex items-center space-x-4">
                                 <span className="text-sm text-gray-600 dark:text-gray-300">
                                     {user.name || user.email}
                                 </span>
@@ -122,7 +122,7 @@ const Navbar = () => {
                                 </button>
                             </div>
                         ) : (
-                            <div className="hidden md:flex space-x-4">
+                            <div className="hidden lg:flex space-x-4">
                                 <Link to="/login" className="btn-primary">
                                     Login
                                 </Link>
@@ -135,7 +135,7 @@ const Navbar = () => {
                         {/* Mobile menu button */}
                         <button
                             onClick={() => setIsOpen(!isOpen)}
-                            className="md:hidden p-2 rounded-lg hover:bg-white/10 transition-colors"
+                            className="lg:hidden p-2 rounded-lg hover:bg-white/10 transition-colors"
                         >
                             {isOpen ? <X size={24} /> : <Menu size={24} />}
                         </button>
@@ -145,7 +145,7 @@ const Navbar = () => {
 
             {/* Mobile Menu */}
             {isOpen && (
-                <div className="md:hidden glass border-t border-white/10">
+                <div className="lg:hidden glass border-t border-white/10">
                     <div className="px-4 pt-2 pb-4 space-y-2">
                         <Link
                             to="/"

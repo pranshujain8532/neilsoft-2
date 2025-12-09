@@ -20,6 +20,12 @@ interface PlantDetailModalProps {
     onClose: () => void;
 }
 
+// Currency: All values in INR (₹)
+// Conversion rate: 1 USD = 89.9 INR
+const USD_TO_INR = 89.9;
+const toINR = (usd: number) => Math.round(usd * USD_TO_INR);
+const formatINR = (value: number) => `₹${value.toLocaleString('en-IN')}`;
+
 const PlantDetailModal: React.FC<PlantDetailModalProps> = ({ plant, onClose }) => {
     if (!plant) return null;
 
@@ -91,15 +97,15 @@ const PlantDetailModal: React.FC<PlantDetailModalProps> = ({ plant, onClose }) =
                                 <div className="min-w-[600px]">
                                     <div className="flex items-center gap-2 text-lg flex-wrap">
                                         <span className={dailyProfit >= 0 ? "text-emerald-400 font-bold" : "text-red-400 font-bold"}>
-                                            ${dailyProfit.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                            {formatINR(toINR(dailyProfit))}
                                         </span>
                                         <span className="text-gray-500">=</span>
                                         <span className="text-blue-300">
-                                            (${totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })} Revenue)
+                                            ({formatINR(toINR(totalRevenue))} Revenue)
                                         </span>
                                         <span className="text-gray-500">-</span>
                                         <span className="text-amber-300">
-                                            (${totalDailyCost.toLocaleString(undefined, { maximumFractionDigits: 0 })} Costs)
+                                            ({formatINR(toINR(totalDailyCost))} Costs)
                                         </span>
                                     </div>
 
@@ -109,11 +115,11 @@ const PlantDetailModal: React.FC<PlantDetailModalProps> = ({ plant, onClose }) =
                                             <div className="space-y-1">
                                                 <div className="flex justify-between text-gray-400">
                                                     <span>H₂ Sales:</span>
-                                                    <span className="text-gray-200">${h2Revenue.toLocaleString()}</span>
+                                                    <span className="text-gray-200">{formatINR(toINR(h2Revenue))}</span>
                                                 </div>
                                                 <div className="flex justify-between text-gray-400">
                                                     <span>O₂ Sales:</span>
-                                                    <span className="text-gray-200">${o2Revenue.toLocaleString()}</span>
+                                                    <span className="text-gray-200">{formatINR(toINR(o2Revenue))}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -122,19 +128,19 @@ const PlantDetailModal: React.FC<PlantDetailModalProps> = ({ plant, onClose }) =
                                             <div className="space-y-1">
                                                 <div className="flex justify-between text-gray-400">
                                                     <span>Energy (60%):</span>
-                                                    <span className="text-gray-300">-${costBreakdown.energy.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                                                    <span className="text-gray-300">-{formatINR(toINR(costBreakdown.energy))}</span>
                                                 </div>
                                                 <div className="flex justify-between text-gray-400">
                                                     <span>Capex/Depr (20%):</span>
-                                                    <span className="text-gray-300">-${costBreakdown.capex_depreciation.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                                                    <span className="text-gray-300">-{formatINR(toINR(costBreakdown.capex_depreciation))}</span>
                                                 </div>
                                                 <div className="flex justify-between text-gray-400">
                                                     <span>Maintenance (10%):</span>
-                                                    <span className="text-gray-300">-${costBreakdown.maintenance.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                                                    <span className="text-gray-300">-{formatINR(toINR(costBreakdown.maintenance))}</span>
                                                 </div>
                                                 <div className="flex justify-between text-gray-400">
                                                     <span>Labor/Ops (10%):</span>
-                                                    <span className="text-gray-300">-${(costBreakdown.operational_labor + costBreakdown.water_materials).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                                                    <span className="text-gray-300">-{formatINR(toINR(costBreakdown.operational_labor + costBreakdown.water_materials))}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -238,8 +244,8 @@ const PlantDetailModal: React.FC<PlantDetailModalProps> = ({ plant, onClose }) =
                         <div className="flex justify-center">
                             <div className="bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 rounded-2xl px-8 py-4 text-center">
                                 <div className="text-sm text-emerald-400 mb-1">Levelized Cost of Hydrogen</div>
-                                <div className="text-4xl font-bold text-white">${lcoh.toFixed(2)}<span className="text-lg text-gray-400">/kg</span></div>
-                                {lcoh < 2 && <div className="text-xs text-emerald-400 mt-1">✓ Below $2/kg target</div>}
+                                <div className="text-4xl font-bold text-white">₹{Math.round(lcoh * 89.9)}<span className="text-lg text-gray-400">/kg</span></div>
+                                {lcoh < 2 && <div className="text-xs text-emerald-400 mt-1">✓ Below ₹180/kg target</div>}
                             </div>
                         </div>
                     </div>
