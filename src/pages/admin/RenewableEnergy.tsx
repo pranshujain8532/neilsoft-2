@@ -731,30 +731,6 @@ const RenewableEnergy = () => {
                                     <Bar dataKey="forHydro" fill="#06B6D4" name="For Hydro (L)" />
                                 </BarChart>
                             </ResponsiveContainer>
-
-                            {/* Water summary */}
-                            {energyBalance?.water_recycling && (
-                                <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-gray-700">
-                                    <div className="text-center">
-                                        <p className="text-red-400 font-bold">
-                                            {energyBalance.water_recycling.water_consumed_liters.toLocaleString()} L
-                                        </p>
-                                        <p className="text-xs text-gray-400">Total Consumed</p>
-                                    </div>
-                                    <div className="text-center">
-                                        <p className="text-green-400 font-bold">
-                                            {energyBalance.water_recycling.water_recovered_liters.toLocaleString()} L
-                                        </p>
-                                        <p className="text-xs text-gray-400">Total Recovered</p>
-                                    </div>
-                                    <div className="text-center">
-                                        <p className="text-cyan-400 font-bold">
-                                            {energyBalance.water_recycling.recovery_efficiency_percent.toFixed(1)}%
-                                        </p>
-                                        <p className="text-xs text-gray-400">Recovery Efficiency</p>
-                                    </div>
-                                </div>
-                            )}
                         </motion.div>
                     </div>
 
