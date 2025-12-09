@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
-import { Menu, X, Home, LayoutDashboard, Factory, TruckIcon, Container, ShoppingCart, LogOut, Sun, Moon, Package, Wrench, Zap } from 'lucide-react';
+import { Menu, X, Home, LayoutDashboard, Factory, TruckIcon, Container, ShoppingCart, LogOut, Sun, Moon, Package, Wrench, Zap, Shield } from 'lucide-react';
 import { useTheme } from '@/hooks/useTheme';
 
 const Navbar = () => {
@@ -64,6 +64,10 @@ const Navbar = () => {
                                     <Link to="/admin/renewable-energy" className="navbar-link flex items-center space-x-1">
                                         <Zap size={18} />
                                         <span>Renewable</span>
+                                    </Link>
+                                    <Link to="/admin/shutdown" className="navbar-link flex items-center space-x-1">
+                                        <Shield size={18} />
+                                        <span>Resilience</span>
                                     </Link>
 
                                     <Link to="/admin/orders" className="navbar-link flex items-center space-x-1">
