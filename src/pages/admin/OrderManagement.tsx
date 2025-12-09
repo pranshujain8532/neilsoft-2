@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import {
-    Package, Truck, CheckCircle, Clock, MapPin, X, DollarSign,
+    Package, Truck, CheckCircle, Clock, MapPin, X, IndianRupee,
     ShoppingCart, ArrowRight, RefreshCw, Loader2, ChevronRight,
     Zap, TrendingUp, AlertCircle, User, Phone
 } from 'lucide-react';
@@ -161,8 +161,8 @@ const OrderManagement = () => {
                 setSelectedOrder({ ...order, status: 'in-transit', transport_method: option.mode });
             }
 
-            const costUSD = (option.total_cost_inr * 0.012).toFixed(2);
-            alert(`Dispatch Confirmed!\n\n${option.mode_name}\nETA: ${option.eta}\nCost: $${costUSD}\nCO2: ${option.co2_kg} kg`);
+            const costINR = option.total_cost_inr?.toLocaleString('en-IN') || '0';
+            alert(`Dispatch Confirmed!\n\n${option.mode_name}\nETA: ${option.eta}\nCost: ₹${costINR}\nCO2: ${option.co2_kg} kg`);
         } catch (error: any) {
             console.error('Dispatch failed', error);
             alert(`Failed to dispatch: ${error.message}`);
@@ -324,10 +324,10 @@ const OrderManagement = () => {
                                                     </div>
                                                     <div>
                                                         <div className="flex items-center gap-1.5 text-gray-500 text-xs mb-1">
-                                                            <DollarSign className="w-3 h-3" />
+                                                            <IndianRupee className="w-3 h-3" />
                                                             Total
                                                         </div>
-                                                        <p className="text-lg font-bold text-emerald-400">${order.total_price?.toFixed(2) || 'N/A'}</p>
+                                                        <p className="text-lg font-bold text-emerald-400">₹{order.total_price?.toLocaleString('en-IN') || 'N/A'}</p>
                                                     </div>
                                                 </div>
 
@@ -373,7 +373,7 @@ const OrderManagement = () => {
                                             </div>
                                             <div className="bg-gray-900/50 rounded-xl p-3">
                                                 <p className="text-gray-500 text-xs mb-1">Total</p>
-                                                <p className="text-emerald-400 font-bold">${selectedOrder.total_price?.toFixed(2)}</p>
+                                                <p className="text-emerald-400 font-bold">₹{selectedOrder.total_price?.toLocaleString('en-IN')}</p>
                                             </div>
                                             <div className="bg-gray-900/50 rounded-xl p-3">
                                                 <p className="text-gray-500 text-xs mb-1">Status</p>

@@ -8,6 +8,8 @@ import {
 import {
     LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
+import Electrolyzer3D from '../../components/Electrolyzer3D';
+import Compressor3D from '../../components/Compressor3D';
 
 // Types
 interface Equipment {
@@ -83,6 +85,22 @@ interface Plant {
     status: string;
 }
 
+// Real-time sensor telemetry for 3D models
+interface SensorTelemetry {
+    electrolyzer: {
+        temperature: number;
+        pressure: number;
+        efficiency: number;
+        isOperating: boolean;
+    };
+    compressor: {
+        temperature: number;
+        pressure: number;
+        oilLevel: number;
+        isOperating: boolean;
+    };
+}
+
 const ML_API_URL = (import.meta as any).env?.VITE_ML_API_URL || 'http://localhost:5001';
 
 const PlantMaintenance = () => {
@@ -97,6 +115,12 @@ const PlantMaintenance = () => {
     const [sensorData, setSensorData] = useState<{ [key: string]: SensorChartData }>({});
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+
+    // Real-time sensor telemetry for 3D models (from Supabase)
+    const [sensorTelemetry, setSensorTelemetry] = useState<SensorTelemetry>({
+        electrolyzer: { temperature: 72, pressure: 32, efficiency: 85, isOperating: true },
+        compressor: { temperature: 48, pressure: 7.5, oilLevel: 82, isOperating: true }
+    });
 
     // Fetch plants from Supabase
     useEffect(() => {
@@ -167,6 +191,60 @@ const PlantMaintenance = () => {
             setLoading(false);
         }
     };
+
+    // Fetch real-time sensor telemetry from Supabase for 3D models
+    const fetchSensorTelemetry = async () => {
+        try {
+            const { supabase } = await import('@/lib/supabase');
+
+            // Fetch latest sensor data for electrolyzer and compressor from plant_equipment
+            const { data: equipmentData, error: eqError } = await supabase
+                .from('plant_equipment')
+                .select('equipment_type, temperature, pressure, health_score, status')
+                .eq('plant_id', selectedPlantId)
+                .in('equipment_type', ['electrolyzer', 'compressor']);
+
+            if (eqError) {
+                console.error('Supabase equipment fetch error:', eqError);
+                return;
+            }
+
+            if (equipmentData && equipmentData.length > 0) {
+                const electrolyzerData = equipmentData.find(e => e.equipment_type === 'electrolyzer');
+                const compressorData = equipmentData.find(e => e.equipment_type === 'compressor');
+
+                setSensorTelemetry({
+                    electrolyzer: {
+                        temperature: electrolyzerData?.temperature || 72,
+                        pressure: electrolyzerData?.pressure || 32,
+                        efficiency: electrolyzerData?.health_score || 85,
+                        isOperating: electrolyzerData?.status === 'operational'
+                    },
+                    compressor: {
+                        temperature: compressorData?.temperature || 48,
+                        pressure: compressorData?.pressure || 7.5,
+                        oilLevel: 82, // Default oil level (could be added to schema)
+                        isOperating: compressorData?.status === 'operational'
+                    }
+                });
+
+                console.log('[3D Models] Sensor telemetry updated from Supabase:', { electrolyzerData, compressorData });
+            }
+        } catch (err) {
+            console.error('Failed to fetch sensor telemetry from Supabase:', err);
+        }
+    };
+
+    // Fetch sensor telemetry when equipment data changes
+    useEffect(() => {
+        if (selectedPlantId && !loading) {
+            fetchSensorTelemetry();
+
+            // Set up polling every 10 seconds for real-time updates
+            const interval = setInterval(fetchSensorTelemetry, 10000);
+            return () => clearInterval(interval);
+        }
+    }, [selectedPlantId, loading]);
 
     const fetchSensorData = async (equipmentId: string) => {
         try {
@@ -374,6 +452,31 @@ const PlantMaintenance = () => {
                         </div>
                     </motion.div>
                 )}
+
+                {/* 3D Equipment Visualization - Side by Side */}
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1 }}
+                    className="mb-6"
+                >
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <Electrolyzer3D
+                            className="h-[350px]"
+                            isOperating={sensorTelemetry.electrolyzer.isOperating}
+                            temperature={sensorTelemetry.electrolyzer.temperature}
+                            pressure={sensorTelemetry.electrolyzer.pressure}
+                            efficiency={sensorTelemetry.electrolyzer.efficiency}
+                        />
+                        <Compressor3D
+                            className="h-[350px]"
+                            isOperating={sensorTelemetry.compressor.isOperating}
+                            temperature={sensorTelemetry.compressor.temperature}
+                            pressure={sensorTelemetry.compressor.pressure}
+                            oilLevel={sensorTelemetry.compressor.oilLevel}
+                        />
+                    </div>
+                </motion.div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Equipment Section - Takes 2 columns */}

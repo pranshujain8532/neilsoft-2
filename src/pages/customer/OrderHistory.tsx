@@ -176,7 +176,7 @@ const OrderHistory = () => {
                                     <span className="text-xs text-gray-400 uppercase">Total Spent</span>
                                 </div>
                                 <div className="text-2xl font-bold text-white">
-                                    ${orders.reduce((sum, o) => sum + (o.total_price || 0), 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                    ₹{orders.reduce((sum, o) => sum + (o.total_price || 0), 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                                 </div>
                             </div>
                             <div className="bg-slate-800/40 backdrop-blur-xl rounded-xl p-4 border border-slate-700/50">
@@ -244,7 +244,7 @@ const OrderHistory = () => {
                                                 <div className="text-center">
                                                     <div className="text-xs text-gray-500 uppercase">Total</div>
                                                     <div className="font-bold text-xl bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">
-                                                        ${order.total_price?.toFixed(2)}
+                                                        ₹{order.total_price?.toLocaleString('en-IN')}
                                                     </div>
                                                 </div>
                                                 <motion.button

@@ -19,7 +19,7 @@ const Shop = () => {
                 id: '1',
                 name: 'Green Hydrogen - Industrial',
                 purity: '99.9%',
-                price: 2.80,
+                price: 252,  // ₹252 per kg (was $2.80)
                 unit: 'per kg',
                 minOrder: 100,
                 description: 'High-purity hydrogen ideal for industrial manufacturing and chemical processes',
@@ -33,7 +33,7 @@ const Shop = () => {
                 id: '2',
                 name: 'Green Hydrogen - Premium',
                 purity: '99.999%',
-                price: 4.20,
+                price: 378,  // ₹378 per kg (was $4.20)
                 unit: 'per kg',
                 minOrder: 50,
                 description: 'Ultra-pure hydrogen for fuel cells, electronics, and aerospace applications',
@@ -47,7 +47,7 @@ const Shop = () => {
                 id: '3',
                 name: 'Bulk Contract (Monthly)',
                 purity: '99.9%',
-                price: 2.50,
+                price: 225,  // ₹225 per kg (was $2.50)
                 unit: 'per kg',
                 minOrder: 500,
                 description: 'Long-term supply contract with guaranteed delivery and discounted rates',
@@ -152,8 +152,8 @@ const Shop = () => {
                             transition={{ delay: idx * 0.1 }}
                             whileHover={{ y: -4 }}
                             className={`relative bg-slate-800/40 backdrop-blur-xl rounded-2xl p-6 border transition-all ${product.popular
-                                    ? 'border-emerald-500/50 shadow-lg shadow-emerald-500/10'
-                                    : 'border-slate-700/50 hover:border-emerald-500/30'
+                                ? 'border-emerald-500/50 shadow-lg shadow-emerald-500/10'
+                                : 'border-slate-700/50 hover:border-emerald-500/30'
                                 }`}
                         >
                             {/* Popular Badge */}
@@ -170,8 +170,8 @@ const Shop = () => {
                                     <Zap className="w-6 h-6 text-emerald-400" />
                                 </div>
                                 <span className={`px-3 py-1 rounded-full text-xs font-medium ${product.available
-                                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                                        : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                    : 'bg-red-500/20 text-red-400 border border-red-500/30'
                                     }`}>
                                     {product.available ? 'In Stock' : 'Limited'}
                                 </span>
@@ -206,7 +206,7 @@ const Shop = () => {
                                 <div className="flex items-baseline justify-between">
                                     <div>
                                         <span className="text-3xl font-bold bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">
-                                            ${product.price.toFixed(2)}
+                                            ₹{product.price.toLocaleString('en-IN')}
                                         </span>
                                         <span className="text-sm text-gray-500 ml-1">{product.unit}</span>
                                     </div>
@@ -224,10 +224,10 @@ const Shop = () => {
                                 onClick={() => addToCart(product)}
                                 disabled={!product.available}
                                 className={`w-full py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all ${addedProduct === product.id
-                                        ? 'bg-emerald-600 text-white'
-                                        : product.available
-                                            ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white hover:shadow-lg hover:shadow-emerald-500/25'
-                                            : 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                                    ? 'bg-emerald-600 text-white'
+                                    : product.available
+                                        ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white hover:shadow-lg hover:shadow-emerald-500/25'
+                                        : 'bg-gray-700 text-gray-400 cursor-not-allowed'
                                     }`}
                             >
                                 {addedProduct === product.id ? (

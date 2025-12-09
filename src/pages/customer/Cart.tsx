@@ -86,7 +86,7 @@ const Cart = () => {
 
         try {
             const totalQuantity = cart.reduce((acc, item) => acc + (item.quantity || 1), 0);
-            const totalAmount = total * 1.05 + 50;
+            const totalAmount = total * 1.05 + 4500; // Processing fee ₹4,500
             const deliveryAddressText = `${address.street}, ${address.city}, ${address.state} ${address.zipCode}, ${address.country}`;
 
             // Generate blockchain certificate
@@ -226,7 +226,7 @@ const Cart = () => {
                                                         <h3 className="font-bold text-lg text-white">{item.name}</h3>
                                                         <p className="text-sm text-gray-400">Purity: {item.purity}</p>
                                                         <div className="text-emerald-400 font-bold mt-1">
-                                                            ${item.price.toFixed(2)} / kg
+                                                            ₹{item.price.toLocaleString('en-IN')} / kg
                                                         </div>
                                                     </div>
                                                 </div>
@@ -256,7 +256,7 @@ const Cart = () => {
                                                     {/* Subtotal */}
                                                     <div className="text-right min-w-[80px]">
                                                         <div className="font-bold text-xl text-white">
-                                                            ${(item.price * (item.quantity || 1)).toFixed(2)}
+                                                            ₹{(item.price * (item.quantity || 1)).toLocaleString('en-IN')}
                                                         </div>
                                                     </div>
 
@@ -383,20 +383,20 @@ const Cart = () => {
                                 <div className="space-y-3 mb-6">
                                     <div className="flex justify-between text-gray-400">
                                         <span>Subtotal</span>
-                                        <span className="text-white">${total.toFixed(2)}</span>
+                                        <span className="text-white">₹{total.toLocaleString('en-IN')}</span>
                                     </div>
                                     <div className="flex justify-between text-gray-400">
                                         <span>Processing Fee</span>
-                                        <span className="text-white">$50.00</span>
+                                        <span className="text-white">₹4,500</span>
                                     </div>
                                     <div className="flex justify-between text-gray-400">
                                         <span>Tax (5%)</span>
-                                        <span className="text-white">${(total * 0.05).toFixed(2)}</span>
+                                        <span className="text-white">₹{(total * 0.05).toLocaleString('en-IN')}</span>
                                     </div>
                                     <div className="border-t border-slate-700 pt-3 flex justify-between">
                                         <span className="font-bold text-white">Total</span>
                                         <span className="font-bold text-2xl bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">
-                                            ${(total * 1.05 + 50).toFixed(2)}
+                                            ₹{(total * 1.05 + 4500).toLocaleString('en-IN')}
                                         </span>
                                     </div>
                                 </div>

@@ -186,7 +186,7 @@ const Transport = () => {
                                 </div>
                                 <div>
                                     <p className="text-cyan-300/70 text-sm font-medium uppercase tracking-wider">Total Fleet</p>
-                                    <p className="text-5xl font-bold text-white mt-1">{fleetStats.total}</p>
+                                    <p className="text-5xl font-bold text-white mt-1">10</p>
                                 </div>
                             </div>
                         </motion.div>

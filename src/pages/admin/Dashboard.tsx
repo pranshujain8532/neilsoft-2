@@ -13,6 +13,7 @@ import {
     BarChart, Bar, Legend
 } from 'recharts';
 import PlantDetailModal from '../../components/PlantDetailModal';
+import FactoryModel3D from '../../components/FactoryModel3D';
 
 // Currency: All values in INR (₹)
 // LCOH values are stored in USD but displayed in INR
@@ -394,6 +395,16 @@ const Dashboard = () => {
                             <div className="text-xs text-green-400">Environmental Impact</div>
                         </div>
                     </div>
+                </motion.div>
+
+                {/* 3D Factory Model Section */}
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                    className="mb-6"
+                >
+                    <FactoryModel3D className="h-[400px]" />
                 </motion.div>
 
                 {/* Main Content Grid */}

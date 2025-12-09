@@ -116,41 +116,16 @@ const Signup = () => {
                     </div>
 
                     {isSignup && (
-                        <>
-                            <div className="input">
-                                <input
-                                    type="password"
-                                    name="confirmPassword"
-                                    required
-                                    value={formData.confirmPassword}
-                                    onChange={handleChange}
-                                />
-                                <label>Confirm Password</label>
-                            </div>
-
-                            <div className="input">
-                                <select name="role" value={formData.role} onChange={handleChange}>
-                                    <option value="customer">Customer</option>
-                                    <option value="admin">Admin</option>
-                                    <option value="supplier">Supplier</option>
-                                    <option value="logistics">Logistics Partner</option>
-                                </select>
-                                <label>Role</label>
-                            </div>
-
-                            {formData.role !== "customer" && (
-                                <div className="input">
-                                    <input
-                                        type="text"
-                                        name="companyName"
-                                        required
-                                        value={formData.companyName}
-                                        onChange={handleChange}
-                                    />
-                                    <label>Company Name</label>
-                                </div>
-                            )}
-                        </>
+                        <div className="input">
+                            <input
+                                type="password"
+                                name="confirmPassword"
+                                required
+                                value={formData.confirmPassword}
+                                onChange={handleChange}
+                            />
+                            <label>Confirm Password</label>
+                        </div>
                     )}
 
                     <button type="submit" disabled={loading}>

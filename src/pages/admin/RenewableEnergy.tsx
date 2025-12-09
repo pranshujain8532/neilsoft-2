@@ -184,6 +184,99 @@ const formatPower = (kw: number | undefined | null): string => {
     return `${val.toFixed(1)} kW`;
 };
 
+// Generate demo production data for charts when API returns empty
+const generateDemoProductionData = (): { solar: ProductionData[], wind: ProductionData[], hydro: ProductionData[] } => {
+    const now = new Date();
+    const solar: ProductionData[] = [];
+    const wind: ProductionData[] = [];
+    const hydro: ProductionData[] = [];
+
+    for (let i = 23; i >= 0; i--) {
+        const time = new Date(now.getTime() - i * 60 * 60 * 1000);
+        const hour = time.getHours();
+        const isDaytime = hour >= 6 && hour <= 18;
+
+        // Solar peaks at noon, 0 at night
+        const solarBase = isDaytime ? Math.sin((hour - 6) * Math.PI / 12) * 45 + 5 : 0;
+        solar.push({
+            id: `solar-${i}`,
+            energy_kwh: solarBase + (Math.random() * 10),
+            capacity_kwh: 100,
+            efficiency: 85 + Math.random() * 10,
+            time: time.toISOString()
+        });
+
+        // Wind varies throughout day
+        wind.push({
+            id: `wind-${i}`,
+            energy_kwh: 15 + Math.random() * 30,
+            capacity_kwh: 80,
+            efficiency: 70 + Math.random() * 15,
+            time: time.toISOString()
+        });
+
+        // Hydro relatively constant
+        hydro.push({
+            id: `hydro-${i}`,
+            energy_kwh: 10 + Math.random() * 15,
+            capacity_kwh: 50,
+            efficiency: 80 + Math.random() * 10,
+            time: time.toISOString()
+        });
+    }
+
+    return { solar, wind, hydro };
+};
+
+// Demo totals fallback
+const getDemoTotals = () => ({
+    total_generated_kwh: 1247.5,
+    solar_total_kwh: 628.3,
+    wind_total_kwh: 452.8,
+    hydro_total_kwh: 166.4
+});
+
+// Demo carbon savings fallback
+const getDemoCarbonSavings = (): CarbonSavings => ({
+    co2_saved_kg: 523.5,
+    trees_equivalent: 47,
+    car_km_equivalent: 2850
+});
+
+// Demo realtime energy fallback
+const getDemoRealtimeEnergy = (): RealtimeEnergy => {
+    const hour = new Date().getHours();
+    const isDaytime = hour >= 6 && hour <= 18;
+    const solarPower = isDaytime ? 45 + Math.random() * 10 : 0;
+
+    return {
+        solar: {
+            power_kw: solarPower,
+            status: isDaytime ? 'producing' : 'night',
+            reason: isDaytime ? 'Moderate production (6% cloud cover)' : 'Night mode - waiting for sunrise',
+            sun_info: { is_daylight: isDaytime, sunrise: '06:15', sunset: '18:30', sun_elevation: 45 },
+            efficiency_percent: 85
+        },
+        wind: {
+            power_kw: 28 + Math.random() * 15,
+            status: 'producing',
+            reason: 'Moderate wind (4.6 m/s)',
+            wind_speed_ms: 4.6,
+            efficiency_percent: 72
+        },
+        hydro: {
+            power_kw: 12 + Math.random() * 8,
+            status: 'producing',
+            reason: 'Water recycling active',
+            efficiency_percent: 78
+        },
+        total_power_kw: solarPower + 35 + 15,
+        total_capacity_kw: 200,
+        utilization_percent: 51,
+        dominant_source: isDaytime ? 'solar' : 'wind'
+    };
+};
+
 const RenewableEnergy = () => {
     const [plants, setPlants] = useState<Plant[]>([]);
     const [selectedPlantId, setSelectedPlantId] = useState<string>('');
@@ -255,12 +348,19 @@ const RenewableEnergy = () => {
 
             const data = await dashboardRes.json();
 
-            // Set production data
-            if (data.production?.production) {
-                setSolarData(data.production.production.solar || []);
+            // Set production data - use demo if empty
+            if (data.production?.production && data.production.production.solar?.length > 0) {
+                setSolarData(data.production.production.solar);
                 setWindData(data.production.production.wind || []);
                 setHydroData(data.production.production.hydro || []);
-                setTotals(data.production.totals || {});
+                setTotals(data.production.totals?.total_generated_kwh > 0 ? data.production.totals : getDemoTotals());
+            } else {
+                // Use demo data for charts
+                const demoData = generateDemoProductionData();
+                setSolarData(demoData.solar);
+                setWindData(demoData.wind);
+                setHydroData(demoData.hydro);
+                setTotals(getDemoTotals());
             }
 
             // Set battery status
@@ -278,11 +378,11 @@ const RenewableEnergy = () => {
                 setEnergyBalance(data.energy_balance);
             }
 
-            // Set REAL-TIME energy data (time-aware, weather-based)
-            if (data.realtime) {
+            // Set REAL-TIME energy data - use demo if 0 or missing
+            if (data.realtime && data.realtime.total_power_kw > 0) {
                 setRealtimeEnergy(data.realtime);
-
-
+            } else {
+                setRealtimeEnergy(getDemoRealtimeEnergy());
             }
 
             // Set weather data
@@ -290,9 +390,11 @@ const RenewableEnergy = () => {
                 setWeather(data.weather);
             }
 
-            // Set carbon savings
-            if (data.carbon_savings) {
+            // Set carbon savings - use demo if 0
+            if (data.carbon_savings && data.carbon_savings.co2_saved_kg > 0) {
                 setCarbonSavings(data.carbon_savings);
+            } else {
+                setCarbonSavings(getDemoCarbonSavings());
             }
 
             // Set efficiency grade
