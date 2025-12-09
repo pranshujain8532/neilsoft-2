@@ -8,10 +8,10 @@ start "Backend Server (Port 5000)" cmd /k "cd server && npm install && npm run d
 start "ML Service (Port 5001)" cmd /k "cd ml-services && pip install -r requirements.txt && python app.py"
 
 :: Start Frontend
-start "Frontend (Port 5173)" cmd /k "npm install && npm run dev"
+start "Frontend (Port 3000)" cmd /k "npm install && npm run dev"
 
 echo All services are starting...
 echo Backend: http://localhost:5000
 echo ML Service: http://localhost:5001
-echo Frontend: http://localhost:5173
+echo Frontend: http://localhost:3000
 pause

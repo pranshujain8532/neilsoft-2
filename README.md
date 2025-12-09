@@ -4,7 +4,7 @@
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Stack](https://img.shields.io/badge/stack-React%20|%20Flask%20|%20TensorFlow%20|%20Supabase-orange)
 
-> **Smart India Hackathon 2025 Project**  
+> **Smart India Hackathon 2025 Project for NEILSOFT(PS-id : SIH25260)**  
 > A comprehensive AI-powered platform for optimizing green hydrogen production with target LCOH < $2/kg
 
 ---
@@ -415,22 +415,90 @@ const fetchSensorTelemetry = async () => {
 
 ## Deployment
 
+### Supabase Credentials
+
+| Parameter | Value |
+|-----------|-------|
+| **Project ID** | `mnigrozyrnimwzczehbr` |
+| **Project URL** | `https://mnigrozyrnimwzczehbr.supabase.co` |
+| **Anon Key** | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1uaWdyb3p5cm5pbXd6Y3plaGJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxODcyMDksImV4cCI6MjA3OTc2MzIwOX0.vZoZMCpnwHhpm7A59dGgSuIRwjzooWROttYqkZ-wKGw` |
+| **Service Role Key** | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1uaWdyb3p5cm5pbXd6Y3plaGJyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NDE4NzIwOSwiZXhwIjoyMDc5NzYzMjA5fQ.n_fpKrbIvOgUAByr0eKj4CxptbAwiQ2iQz2z9wFaR2Y` |
+
 ### Environment Variables
 
-```env
-# Frontend (.env)
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-key
-VITE_SUPABASE_SERVICE_ROLE_KEY=your-service-key
-VITE_ML_API_URL=http://localhost:5001
-VITE_GOOGLE_MAPS_API_KEY=your-maps-key
+> ⚠️ **Note**: The following are the actual API keys used in this project. Handle with care.
 
-# ML Services (.env)
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_KEY=your-service-key
-GEMINI_API_KEY=your-gemini-key
-OPENWEATHER_API_KEY=your-weather-key
+#### Frontend (.env)
+```env
+# Supabase Configuration
+VITE_SUPABASE_URL=https://mnigrozyrnimwzczehbr.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1uaWdyb3p5cm5pbXd6Y3plaGJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxODcyMDksImV4cCI6MjA3OTc2MzIwOX0.vZoZMCpnwHhpm7A59dGgSuIRwjzooWROttYqkZ-wKGw
+VITE_SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1uaWdyb3p5cm5pbXd6Y3plaGJyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NDE4NzIwOSwiZXhwIjoyMDc5NzYzMjA5fQ.n_fpKrbIvOgUAByr0eKj4CxptbAwiQ2iQz2z9wFaR2Y
+
+# API URLs
+VITE_ML_API_URL=http://localhost:5001
 ```
+
+#### ML Services (ml-services/.env)
+```env
+# ML Service Configuration
+ML_PORT=5001
+
+# Google Gemini AI (Chatbot)
+GEMINI_API_KEY=AIzaSyAHYS3NyCUEC7cYQeY-L4ZauIGAKbSZMHM
+GEMINI_MODEL=gemini-2.0-flash-experimental
+
+# OpenWeatherMap API
+WEATHER_API_KEY=e168c270a2561b64d8db9ebbba2dc2bd
+
+# Google Maps API
+GOOGLE_MAPS_API_KEY=AIzaSyDyaStNd9U3Q0BF4tDi-URy8ez19VpN57U
+
+# Supabase
+SUPABASE_URL=https://mnigrozyrnimwzczehbr.supabase.co
+SUPABASE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1uaWdyb3p5cm5pbXd6Y3plaGJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxODcyMDksImV4cCI6MjA3OTc2MzIwOX0.vZoZMCpnwHhpm7A59dGgSuIRwjzooWROttYqkZ-wKGw
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1uaWdyb3p5cm5pbXd6Y3plaGJyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NDE4NzIwOSwiZXhwIjoyMDc5NzYzMjA5fQ.n_fpKrbIvOgUAByr0eKj4CxptbAwiQ2iQz2z9wFaR2Y
+
+# Email Alerts (Resend)
+ADMIN_EMAIL=neilsofttest6@gmail.com
+RESEND_API_KEY=re_UXFY8xLG_ERvGSyajTVX5Cidadg3fqxup
+ALERTS_ENABLED=false
+
+# Real-time update interval
+REALTIME_UPDATE_INTERVAL=10
+```
+
+#### Backend Server (server/.env)
+```env
+NODE_ENV=development
+PORT=5000
+
+# JWT Authentication
+JWT_SECRET=(by through supabase)
+JWT_EXPIRES_IN=7d
+
+# CORS
+CLIENT_URL=http://localhost:3000
+
+# Google Maps API
+GOOGLE_MAPS_API_KEY=AIzaSyDyaStNd9U3Q0BF4tDi-URy8ez19VpN57U
+
+# Weather API
+WEATHER_API_KEY=e168c270a2561b64d8db9ebbba2dc2bd
+
+# Blockchain (Polygon - Optional)
+POLYGON_RPC_URL=https://polygon-rpc.com
+```
+
+### API Keys Summary
+
+| Service | Key Variable | Purpose |
+|---------|--------------|---------|
+| **Supabase** | `SUPABASE_URL`, `SUPABASE_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | PostgreSQL database, Auth, Realtime |
+| **Google Gemini** | `GEMINI_API_KEY` | AI Chatbot for plant operators |
+| **Google Maps** | `GOOGLE_MAPS_API_KEY` | Transport route visualization |
+| **OpenWeatherMap** | `WEATHER_API_KEY` | Real-time weather for energy forecasting |
+| **Resend** | `RESEND_API_KEY` | Email alerts for critical events |
 
 ### Docker Deployment
 
@@ -526,9 +594,9 @@ MIT License - See [LICENSE](LICENSE) for details.
 
 ## Contact
 
-**Team**: Smart India Hackathon 2025 Participants  
+**Team**: HouseOfCoders (team id - 74566) 
 **Project**: H2-OptiPlant - Green Hydrogen Production Optimization  
-**Email**: [Contact via SIH Portal]
+
 
 ---
 
